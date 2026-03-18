@@ -77,6 +77,8 @@ class Student(Base):
     attendance_records = relationship("Attendance", back_populates="student", cascade="all, delete-orphan")
     incidents = relationship("BehavioralIncident", back_populates="student", cascade="all, delete-orphan")
     predictions = relationship("RiskPrediction", back_populates="student", cascade="all, delete-orphan")
+    marks_entries = relationship("MarksEntry", back_populates="student", cascade="all, delete-orphan")
+    communications    = relationship("Communication",     back_populates="student", cascade="all, delete-orphan")
     
     @property
     def full_name(self):
@@ -235,6 +237,139 @@ class BehavioralIncident(Base):
             'counseling_given': self.counseling_given,
             'follow_up_date': self.follow_up_date.isoformat() if self.follow_up_date else None
         }
+
+# ============================================
+# MARKS ENTRY MODEL - Enhancement 6
+# ============================================
+class MarksEntry(Base):
+    """Marks entry records per student per exam"""
+    __tablename__ = 'marks_entry'
+
+    id              = Column(Integer, primary_key=True, index=True)
+    student_id      = Column(
+                        Integer,
+                        ForeignKey('students.id', ondelete='CASCADE'),
+                        nullable=False,
+                        index=True
+                      )
+    grade           = Column(Integer, nullable=False, index=True)
+    section         = Column(String(10))
+    semester        = Column(String(20), nullable=False, index=True)
+    exam_type       = Column(String(30), nullable=False)
+    math_score      = Column(DECIMAL(5, 2))
+    science_score   = Column(DECIMAL(5, 2))
+    english_score   = Column(DECIMAL(5, 2))
+    social_score    = Column(DECIMAL(5, 2))
+    language_score  = Column(DECIMAL(5, 2))
+    total_marks     = Column(DECIMAL(5, 2))
+    gpa             = Column(DECIMAL(5, 2))
+    failed_subjects = Column(Integer, default=0)
+    assignment_submission_rate = Column(DECIMAL(5, 2), default=100.0)
+    entered_by      = Column(Integer, ForeignKey('users.id'))
+    entered_at      = Column(DateTime, default=datetime.utcnow)
+    updated_at      = Column(DateTime, default=datetime.utcnow,
+                             onupdate=datetime.utcnow)
+    remarks         = Column(Text)
+
+    # Relationships
+    student         = relationship("Student", back_populates="marks_entries")
+    enterer         = relationship("User",    foreign_keys=[entered_by])
+
+    def __repr__(self):
+        return (
+            f"<MarksEntry(student_id={self.student_id}, "
+            f"semester='{self.semester}', "
+            f"exam='{self.exam_type}', gpa={self.gpa})>"
+        )
+
+    def to_dict(self):
+        return {
+            'id'             : self.id,
+            'student_id'     : self.student_id,
+            'grade'          : self.grade,
+            'section'        : self.section,
+            'semester'       : self.semester,
+            'exam_type'      : self.exam_type,
+            'math_score'     : float(self.math_score)     if self.math_score     else None,
+            'science_score'  : float(self.science_score)  if self.science_score  else None,
+            'english_score'  : float(self.english_score)  if self.english_score  else None,
+            'social_score'   : float(self.social_score)   if self.social_score   else None,
+            'language_score' : float(self.language_score) if self.language_score else None,
+            'total_marks'    : float(self.total_marks)    if self.total_marks    else None,
+            'gpa'            : float(self.gpa)            if self.gpa            else None,
+            'failed_subjects': self.failed_subjects,
+            'assignment_submission_rate': float(self.assignment_submission_rate)
+                               if self.assignment_submission_rate else None,
+            'entered_by'     : self.entered_by,
+            'entered_at'     : self.entered_at.isoformat() if self.entered_at else None,
+            'remarks'        : self.remarks
+        }
+
+
+
+# ============================================
+# COMMUNICATION MODEL - Enhancement 9
+# ============================================
+class Communication(Base):
+    """Parent communication records"""
+    __tablename__ = 'communications'
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    student_id         = Column(
+                           Integer,
+                           ForeignKey('students.id', ondelete='CASCADE'),
+                           nullable=False,
+                           index=True
+                         )
+    parent_email       = Column(String(255), nullable=False)
+    parent_name        = Column(String(255))
+    subject            = Column(String(500), nullable=False)
+    message_body       = Column(Text, nullable=False)
+    template_used      = Column(String(100))
+    communication_type = Column(String(50), nullable=False)
+    risk_label         = Column(String(20))
+    sent_by            = Column(Integer, ForeignKey('users.id'))
+    sent_at            = Column(DateTime, default=datetime.utcnow)
+    status             = Column(String(20), default='sent')
+    sendgrid_id        = Column(String(255))
+    error_message      = Column(Text)
+    created_at         = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    student  = relationship("Student", back_populates="communications")
+    sender   = relationship("User",    foreign_keys=[sent_by])
+
+    def __repr__(self):
+        return (
+            f"<Communication(student_id={self.student_id}, "
+            f"type='{self.communication_type}', "
+            f"status='{self.status}')>"
+        )
+
+    def to_dict(self):
+        return {
+            'id'                : self.id,
+            'student_id'        : self.student_id,
+            'parent_email'      : self.parent_email,
+            'parent_name'       : self.parent_name,
+            'subject'           : self.subject,
+            'message_body'      : self.message_body,
+            'template_used'     : self.template_used,
+            'communication_type': self.communication_type,
+            'risk_label'        : self.risk_label,
+            'sent_by'           : self.sent_by,
+            'sent_at'           : self.sent_at.isoformat()
+                                  if self.sent_at else None,
+            'status'            : self.status,
+            'sendgrid_id'       : self.sendgrid_id,
+            'error_message'     : self.error_message,
+            'created_at'        : self.created_at.isoformat()
+                                  if self.created_at else None
+        }
+
+
+
+
 
 # ============================================
 # RISK PREDICTION MODEL

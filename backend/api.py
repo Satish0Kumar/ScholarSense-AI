@@ -943,6 +943,37 @@ def print_startup_message():
     print("   └─ GET  /api/predictions/high-risk          - High-risk students")
     print("\n   System:")
     print("   └─ GET  /api/health               - Health check")
+    print("\n   Behavioral Incidents (Enhancement 4):")
+    print("   └─ POST /api/incidents/log              - Log new incident")
+    print("   └─ GET  /api/incidents                  - Get all incidents")
+    print("   └─ GET  /api/students/{id}/incidents    - Student incidents")
+    print("   └─ GET  /api/incidents/stats            - Incident stats")
+    print("   └─ GET  /api/incidents/trends           - Incident trends")
+    print("   └─ PUT  /api/incidents/{id}             - Update incident")
+    print("   └─ DELETE /api/incidents/{id}           - Delete incident (Admin)")
+    print("\n   Marks Entry (Enhancement 6):")
+    print("   └─ POST /api/marks/entry              - Enter/update marks")
+    print("   └─ GET  /api/marks/{grade}/{section}  - Get class marks")
+    print("   └─ PUT  /api/marks/{record_id}        - Update marks record")
+    print("   └─ GET  /api/marks/stats/{grade}      - Grade analytics")
+    print("   └─ GET  /api/marks/failed             - Failed students")
+    print("\n   Batch Risk Analysis (Enhancement 8):")
+    print("   └─ POST /api/batch/run              - Run batch predictions")
+    print("   └─ GET  /api/batch/predictions      - Get all stored predictions")
+    print("   └─ GET  /api/batch/summary          - School-wide risk summary")
+    print("   └─ GET  /api/batch/unpredicted      - Students with no prediction")
+    print("\n   Parent Communications (Enhancement 9):")
+    print("   └─ POST /api/communications/send          - Send email to parent")
+    print("   └─ POST /api/communications/batch         - Batch send emails")
+    print("   └─ GET  /api/communications/history       - Communication history")
+    print("   └─ GET  /api/communications/stats         - Comm statistics")
+    print("   └─ GET  /api/communications/templates     - Email templates")
+    print("   └─ GET  /api/students/{id}/communications - Student comm history")
+    print("\n   Advanced Analytics (Enhancement 10):")
+    print("   └─ GET /api/analytics/school-overview  - School-wide KPIs")
+    print("   └─ GET /api/analytics/trends           - Time-series trends")
+
+
     print("\n   PDF Reports (Enhancement 4):")
     print("   └─ GET /api/reports/student/{id}  - Student PDF report")
     print("   └─ GET /api/reports/grade/{grade} - Grade wise PDF report")
@@ -1426,6 +1457,1111 @@ def preview_student_report(student_id):
 
 
 
+# ================================================================
+# BEHAVIORAL INCIDENT ROUTES - Enhancement 4
+# ================================================================
+from backend.services.behavioral_service import BehavioralService
+
+@app.route('/api/incidents/log', methods=['POST'])
+@jwt_required()
+def log_incident():
+    """
+    Log a new behavioral incident
+    Body: {
+        "student_id": 1,
+        "incident_date": "2026-03-18",
+        "incident_time": "10:30:00",       ← optional
+        "incident_type": "Disciplinary",
+        "severity": "Minor",
+        "description": "Student disrupted class",
+        "location": "Classroom 5A",        ← optional
+        "action_taken": "Verbal warning",  ← optional
+        "witnesses": "Teacher Ramesh",     ← optional
+        "parent_notified": false,          ← optional
+        "counseling_given": false,         ← optional
+        "follow_up_date": "2026-03-25",    ← optional
+        "notes": "First offence"           ← optional
+    }
+    Returns: {"status": "success", "data": {...}}
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+
+        # Get reporter from JWT
+        reporter_id = int(get_jwt_identity())
+
+        result = BehavioralService.log_incident(data, reporter_id)
+
+        if result['status'] == 'error':
+            return jsonify(result), 400
+
+        print(f"✅ Incident logged by user {reporter_id}")
+        return jsonify(result), 201
+
+    except Exception as e:
+        print(f"❌ Log incident endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/incidents', methods=['GET'])
+@jwt_required()
+def get_incidents():
+    """
+    Get all incidents with optional filters
+    Query params:
+        ?student_id=1
+        &date_from=2026-01-01
+        &date_to=2026-03-31
+        &severity=Critical
+        &type=Bullying
+        &limit=50
+        &offset=0
+    Returns: {"status": "success", "data": {"incidents": [...], "total": int}}
+    """
+    try:
+        filters = {}
+
+        # Parse query params
+        if request.args.get('student_id'):
+            filters['student_id'] = int(request.args.get('student_id'))
+
+        if request.args.get('date_from'):
+            from datetime import date as dt_date
+            filters['date_from'] = datetime.strptime(
+                request.args.get('date_from'), '%Y-%m-%d'
+            ).date()
+
+        if request.args.get('date_to'):
+            filters['date_to'] = datetime.strptime(
+                request.args.get('date_to'), '%Y-%m-%d'
+            ).date()
+
+        if request.args.get('severity'):
+            filters['severity'] = request.args.get('severity')
+
+        if request.args.get('type'):
+            filters['type'] = request.args.get('type')
+
+        filters['limit']  = request.args.get('limit',  50,  type=int)
+        filters['offset'] = request.args.get('offset', 0,   type=int)
+
+        result = BehavioralService.get_incidents(filters)
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Get incidents endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/students/<int:student_id>/incidents', methods=['GET'])
+@jwt_required()
+def get_student_incidents(student_id):
+    """
+    Get all incidents for a specific student
+    Query param: ?limit=20
+    Returns: {"status": "success", "data": {"incidents": [...], "total": int}}
+    """
+    try:
+        limit  = request.args.get('limit', 20, type=int)
+        result = BehavioralService.get_student_incidents(student_id, limit=limit)
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Get student incidents endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/incidents/stats', methods=['GET'])
+@jwt_required()
+def get_incident_stats():
+    """
+    Get incident statistics for dashboard
+    Query param: ?range=30_days   (7_days | 30_days | 90_days | all_time)
+    Returns: {"status": "success", "data": {stats...}}
+    """
+    try:
+        date_range = request.args.get('range', '30_days')
+        result     = BehavioralService.get_incident_stats(date_range)
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Incident stats endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/incidents/trends', methods=['GET'])
+@jwt_required()
+def get_incident_trends():
+    """
+    Get incident trend data (daily counts for line chart)
+    Query param: ?days=30
+    Returns: {"status": "success", "data": {"trends": [...], "period_days": int}}
+    """
+    try:
+        days   = request.args.get('days', 30, type=int)
+        result = BehavioralService.get_incident_trends(days)
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Incident trends endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/incidents/<int:incident_id>', methods=['PUT'])
+@jwt_required()
+def update_incident(incident_id):
+    """
+    Update a behavioral incident
+    Body: fields to update (severity, action_taken, parent_notified, etc.)
+    Returns: {"status": "success", "data": {...}}
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+
+        result = BehavioralService.update_incident(incident_id, data)
+
+        if result['status'] == 'error':
+            return jsonify(result), 404
+
+        print(f"✅ Incident {incident_id} updated")
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Update incident endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/incidents/<int:incident_id>', methods=['DELETE'])
+@jwt_required()
+def delete_incident(incident_id):
+    """
+    Delete a behavioral incident (Admin only)
+    Returns: {"status": "success", "message": "..."}
+    """
+    try:
+        # Admin only
+        claims = get_jwt()
+        if claims.get('role') != 'admin':
+            return jsonify({"status": "error", "message": "Admin access required"}), 403
+
+        result = BehavioralService.delete_incident(incident_id)
+
+        if result['status'] == 'error':
+            return jsonify(result), 404
+
+        print(f"✅ Incident {incident_id} deleted by admin")
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Delete incident endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+
+
+# ================================================================
+# MARKS ENTRY ROUTES - Enhancement 6
+# ================================================================
+from backend.services.marks_service import MarksService
+
+@app.route('/api/marks/entry', methods=['POST'])
+@jwt_required()
+def enter_marks():
+    """
+    Enter marks for a student
+    Body: {
+        "student_id": 1,
+        "semester": "2025-2026 Sem 1",
+        "exam_type": "Mid Term",
+        "math_score": 78.5,
+        "science_score": 82.0,
+        "english_score": 75.0,
+        "social_score": 88.0,
+        "language_score": 91.0,
+        "assignment_submission_rate": 95.0,  ← optional
+        "remarks": "Good performance"         ← optional
+    }
+    Returns: {"status": "success", "data": {...}, "action": "created/updated"}
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+
+        # Get teacher/admin from JWT
+        entered_by = int(get_jwt_identity())
+
+        result = MarksService.enter_marks(data, entered_by)
+
+        if result['status'] == 'error':
+            return jsonify(result), 400
+
+        action      = result.get('action', 'created')
+        status_code = 201 if action == 'created' else 200
+
+        print(f"✅ Marks {action} by user {entered_by} "
+              f"for student {data.get('student_id')}")
+
+        return jsonify(result), status_code
+
+    except Exception as e:
+        print(f"❌ Enter marks endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/marks/<int:grade>/<string:section>', methods=['GET'])
+@jwt_required()
+def get_class_marks(grade, section):
+    """
+    Get all marks for a grade/section
+    Path params: grade (6-10), section (A/B/C/All)
+    Query params:
+        ?semester=2025-2026 Sem 1
+        &exam_type=Mid Term
+    Returns: {"status": "success", "data": {"marks": [...], "total": int}}
+    """
+    try:
+        semester  = request.args.get('semester')
+        exam_type = request.args.get('exam_type')
+
+        # Handle "All" section → pass None to service
+        section_filter = None if section in ('All', 'all', 'None') else section
+
+        result = MarksService.get_class_marks(
+            grade     = grade,
+            section   = section_filter,
+            semester  = semester,
+            exam_type = exam_type
+        )
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Get class marks endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/marks/<int:record_id>', methods=['PUT'])
+@jwt_required()
+def update_marks(record_id):
+    """
+    Update an existing marks record
+    Body: {
+        "math_score": 85.0,
+        "science_score": 90.0,
+        ...any score fields...
+        "remarks": "Updated after recheck"
+    }
+    Returns: {"status": "success", "data": {...}}
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+
+        result = MarksService.update_marks(record_id, data)
+
+        if result['status'] == 'error':
+            return jsonify(result), 404
+
+        print(f"✅ Marks record {record_id} updated")
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Update marks endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/marks/stats/<int:grade>', methods=['GET'])
+@jwt_required()
+def get_marks_stats(grade):
+    """
+    Get marks analytics for a grade
+    Query param: ?section=A  (optional)
+    Returns: {
+        "status": "success",
+        "data": {
+            "avg_gpa", "highest_gpa", "lowest_gpa",
+            "total_failed", "subject_averages",
+            "top_performers", "gpa_distribution"
+        }
+    }
+    """
+    try:
+        section = request.args.get('section')
+        if section in ('All', 'all', 'None', ''):
+            section = None
+
+        result = MarksService.get_marks_stats(grade, section)
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Marks stats endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/marks/failed', methods=['GET'])
+@jwt_required()
+def get_failed_students():
+    """
+    Get students who failed one or more subjects
+    Query params:
+        ?grade=9
+        &semester=2025-2026 Sem 1
+    Returns: {"status": "success", "data": {"failed_students": [...], "total": int}}
+    """
+    try:
+        grade    = request.args.get('grade',    type=int)
+        semester = request.args.get('semester')
+
+        result = MarksService.identify_failed_students(
+            grade    = grade,
+            semester = semester
+        )
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Failed students endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+
+
+# ================================================================
+# BATCH RISK ANALYSIS ROUTES - Enhancement 8
+# ================================================================
+from backend.services.batch_service import BatchService
+
+@app.route('/api/batch/run', methods=['POST'])
+@jwt_required()
+def run_batch_predictions():
+    """
+    Run ML predictions for all/filtered students
+    Body (all optional): {
+        "grade":   9,
+        "section": "A"
+    }
+    Returns: {
+        "status": "success",
+        "data": {
+            "summary": {
+                "total": 120, "success": 115,
+                "skipped": 3, "failed": 2,
+                "risk_summary": {"Low":60,"Medium":30,"High":20,"Critical":5},
+                "run_at": "...", "triggered_by": 1
+            },
+            "results": [{...per student...}]
+        }
+    }
+    """
+    try:
+        data    = request.get_json() or {}
+        filters = {}
+
+        if data.get('grade'):
+            filters['grade']   = int(data['grade'])
+        if data.get('section') and data['section'] not in ('All', 'all'):
+            filters['section'] = data['section']
+
+        triggered_by = int(get_jwt_identity())
+
+        print(f"🔁 Batch prediction triggered by user {triggered_by} "
+              f"| filters: {filters}")
+
+        result = BatchService.run_batch_predictions(
+            filters      = filters,
+            triggered_by = triggered_by
+        )
+
+        if result['status'] == 'error':
+            return jsonify(result), 400
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Batch run endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/batch/predictions', methods=['GET'])
+@jwt_required()
+def get_all_predictions():
+    """
+    Get latest stored predictions for all students
+    (Read-only — does NOT re-run ML)
+    Query params:
+        ?grade=9
+        &section=A
+        &risk_label=Critical
+        &limit=200
+    Returns: {
+        "status": "success",
+        "data": {
+            "students":     [{...}],
+            "total":        int,
+            "risk_summary": {"Low":x,"Medium":x,"High":x,"Critical":x}
+        }
+    }
+    """
+    try:
+        filters = {}
+
+        if request.args.get('grade'):
+            filters['grade']      = int(request.args.get('grade'))
+
+        if request.args.get('section') and \
+           request.args.get('section') not in ('All', 'all', ''):
+            filters['section']    = request.args.get('section')
+
+        if request.args.get('risk_label') and \
+           request.args.get('risk_label') != 'All':
+            filters['risk_label'] = request.args.get('risk_label')
+
+        filters['limit'] = request.args.get('limit', 200, type=int)
+
+        result = BatchService.get_all_predictions(filters)
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Get all predictions endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/batch/summary', methods=['GET'])
+@jwt_required()
+def get_batch_summary():
+    """
+    Get school-wide risk summary stats
+    Returns: {
+        "status": "success",
+        "data": {
+            "risk_summary":      {"Low":x,...},
+            "total_active":      int,
+            "total_predicted":   int,
+            "total_unpredicted": int,
+            "avg_confidence":    float
+        }
+    }
+    """
+    try:
+        result = BatchService.get_batch_summary()
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Batch summary endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+@app.route('/api/batch/unpredicted', methods=['GET'])
+@jwt_required()
+def get_unpredicted_students():
+    """
+    Get students who have no risk prediction yet
+    Query param: ?grade=9  (optional)
+    Returns: {
+        "status": "success",
+        "data": {"students": [...], "total": int}
+    }
+    """
+    try:
+        grade  = request.args.get('grade', type=int)
+        result = BatchService.get_unpredicted_students(grade=grade)
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Unpredicted students endpoint error: {e}")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+
+
+# ================================================================
+# PARENT COMMUNICATION ROUTES - Enhancement 9
+# ================================================================
+from backend.services.communication_service import CommunicationService
+
+@app.route('/api/communications/send', methods=['POST'])
+@jwt_required()
+def send_communication():
+    """
+    Send email to parent of a student
+    Body: {
+        "student_id": 1,
+        "communication_type": "Risk Alert",
+        "custom_subject": "...",       ← required only for Custom type
+        "custom_message": "...",       ← required only for Custom type
+        "extra_data": {                ← optional, enriches template
+            "gpa": 45.5,
+            "failed_subjects": 2,
+            "risk_label": "High",
+            "semester": "2025-2026 Sem 1",
+            "total_marks": 227.5,
+            "custom_message": "..."
+        }
+    }
+    Returns: {"status": "success", "data": {...}}
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                "status":  "error",
+                "message": "No data provided"
+            }), 400
+
+        sent_by = int(get_jwt_identity())
+        result  = CommunicationService.send_communication(data, sent_by)
+
+        if result['status'] == 'error':
+            return jsonify(result), 400
+
+        print(f"✅ Communication sent by user {sent_by} "
+              f"to student {data.get('student_id')}")
+        return jsonify(result), 201
+
+    except Exception as e:
+        print(f"❌ Send communication endpoint error: {e}")
+        return jsonify({
+            "status":  "error",
+            "message": "Internal server error"
+        }), 500
+
+
+@app.route('/api/communications/batch', methods=['POST'])
+@jwt_required()
+def batch_send_communications():
+    """
+    Send same communication type to multiple students at once
+    Body: {
+        "student_ids": [1, 2, 3, 4],
+        "communication_type": "Risk Alert",
+        "extra_data": {
+            "risk_label": "High",
+            "gpa": "N/A"
+        }
+    }
+    Returns: {
+        "status": "success",
+        "data": {"sent": 3, "failed": 1, "total": 4, "results": [...]}
+    }
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                "status":  "error",
+                "message": "No data provided"
+            }), 400
+
+        student_ids = data.get('student_ids', [])
+        if not student_ids:
+            return jsonify({
+                "status":  "error",
+                "message": "student_ids list is required"
+            }), 400
+
+        comm_type  = data.get('communication_type', 'Custom')
+        extra_data = data.get('extra_data', {})
+        sent_by    = int(get_jwt_identity())
+
+        result = CommunicationService.batch_send(
+            student_ids = student_ids,
+            comm_type   = comm_type,
+            extra_data  = extra_data,
+            sent_by     = sent_by
+        )
+
+        print(f"📧 Batch send by user {sent_by}: "
+              f"{result['data']['sent']} sent | "
+              f"{result['data']['failed']} failed")
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Batch send endpoint error: {e}")
+        return jsonify({
+            "status":  "error",
+            "message": "Internal server error"
+        }), 500
+
+
+@app.route('/api/communications/history', methods=['GET'])
+@jwt_required()
+def get_comm_history():
+    """
+    Get communication history with filters
+    Query params:
+        ?student_id=1
+        &comm_type=Risk Alert
+        &status=sent
+        &limit=50
+        &offset=0
+    Returns: {
+        "status": "success",
+        "data": {"history": [...], "total": int}
+    }
+    """
+    try:
+        filters = {}
+
+        if request.args.get('student_id'):
+            filters['student_id'] = int(request.args.get('student_id'))
+        if request.args.get('comm_type'):
+            filters['comm_type']  = request.args.get('comm_type')
+        if request.args.get('status'):
+            filters['status']     = request.args.get('status')
+
+        filters['limit']  = request.args.get('limit',  50, type=int)
+        filters['offset'] = request.args.get('offset', 0,  type=int)
+
+        result = CommunicationService.get_history(filters)
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Comm history endpoint error: {e}")
+        return jsonify({
+            "status":  "error",
+            "message": "Internal server error"
+        }), 500
+
+
+@app.route('/api/communications/stats', methods=['GET'])
+@jwt_required()
+def get_comm_stats():
+    """
+    Get communication statistics
+    Returns: {
+        "status": "success",
+        "data": {
+            "total", "last_week",
+            "by_type": [...],
+            "by_status": [...]
+        }
+    }
+    """
+    try:
+        result = CommunicationService.get_comm_stats()
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Comm stats endpoint error: {e}")
+        return jsonify({
+            "status":  "error",
+            "message": "Internal server error"
+        }), 500
+
+
+@app.route('/api/communications/templates', methods=['GET'])
+@jwt_required()
+def get_comm_templates():
+    """
+    Get all available email templates
+    Returns: {
+        "status": "success",
+        "data": {"templates": [{name, subject, preview}]}
+    }
+    """
+    try:
+        result = CommunicationService.get_templates()
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Get templates endpoint error: {e}")
+        return jsonify({
+            "status":  "error",
+            "message": "Internal server error"
+        }), 500
+
+
+@app.route('/api/students/<int:student_id>/communications', methods=['GET'])
+@jwt_required()
+def get_student_communications(student_id):
+    """
+    Get all communications for a specific student
+    Query param: ?limit=20
+    Returns: {"status": "success", "data": {"history": [...], "total": int}}
+    """
+    try:
+        limit  = request.args.get('limit', 20, type=int)
+        result = CommunicationService.get_history({
+            'student_id': student_id,
+            'limit':      limit
+        })
+
+        if result['status'] == 'error':
+            return jsonify(result), 500
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Student comms endpoint error: {e}")
+        return jsonify({
+            "status":  "error",
+            "message": "Internal server error"
+        }), 500
+
+
+
+# ================================================================
+# ADVANCED ANALYTICS ROUTES - Enhancement 10
+# ================================================================
+from sqlalchemy import func, and_, case
+from backend.database.models import (
+    Student, AcademicRecord, RiskPrediction,
+    BehavioralIncident, Communication, Attendance
+)
+from backend.database.db_config import SessionLocal
+
+@app.route('/api/analytics/school-overview', methods=['GET'])
+@jwt_required()
+def get_school_overview():
+    """
+    School-wide KPI overview — aggregates across all modules
+    Returns: {
+        "status": "success",
+        "data": {
+            "total_students", "total_active",
+            "avg_gpa", "avg_attendance",
+            "risk_distribution": {Low,Medium,High,Critical},
+            "grade_stats": [{grade, total, avg_gpa, avg_attendance}],
+            "total_predictions", "total_incidents",
+            "total_communications"
+        }
+    }
+    """
+    db = SessionLocal()
+    try:
+        # ── Student counts ─────────────────────────────────
+        total_students = db.query(func.count(Student.id)).scalar()
+        total_active   = db.query(func.count(Student.id)).filter(
+            Student.is_active == True
+        ).scalar()
+
+        # ── Average GPA across all latest academic records ─
+        latest_acad_subq = db.query(
+            AcademicRecord.student_id,
+            func.max(AcademicRecord.id).label('max_id')
+        ).group_by(AcademicRecord.student_id).subquery()
+
+        avg_gpa_row = db.query(
+            func.avg(AcademicRecord.current_gpa).label('avg_gpa')
+        ).join(
+            latest_acad_subq,
+            AcademicRecord.id == latest_acad_subq.c.max_id
+        ).first()
+        avg_gpa = round(float(avg_gpa_row.avg_gpa or 0), 2)
+
+        # ── Average attendance rate ────────────────────────
+        avg_att_row = db.query(
+            func.avg(
+                case(
+                    (Attendance.status == 'present', 1),
+                    else_=0
+                )
+            ).label('avg_att')
+        ).scalar()
+        avg_attendance = round(float(avg_att_row or 0) * 100, 2)
+
+        # ── Risk distribution (latest per student) ─────────
+        latest_pred_subq = db.query(
+            RiskPrediction.student_id,
+            func.max(RiskPrediction.id).label('max_id')
+        ).group_by(RiskPrediction.student_id).subquery()
+
+        risk_counts = db.query(
+            RiskPrediction.risk_label,
+            func.count().label('count')
+        ).join(
+            latest_pred_subq,
+            RiskPrediction.id == latest_pred_subq.c.max_id
+        ).group_by(RiskPrediction.risk_label).all()
+
+        risk_dist = {'Low': 0, 'Medium': 0, 'High': 0, 'Critical': 0}
+        for row in risk_counts:
+            if row.risk_label in risk_dist:
+                risk_dist[row.risk_label] = row.count
+
+        # ── Grade-wise stats ───────────────────────────────
+        grade_stats_rows = db.query(
+            Student.grade,
+            func.count(Student.id).label('total'),
+            func.avg(AcademicRecord.current_gpa).label('avg_gpa')
+        ).outerjoin(
+            latest_acad_subq,
+            Student.id == latest_acad_subq.c.student_id
+        ).outerjoin(
+            AcademicRecord,
+            and_(
+                AcademicRecord.student_id == Student.id,
+                AcademicRecord.id == latest_acad_subq.c.max_id
+            )
+        ).filter(
+            Student.is_active == True
+        ).group_by(Student.grade).order_by(Student.grade).all()
+
+        grade_stats = [
+            {
+                'grade':   row.grade,
+                'total':   row.total,
+                'avg_gpa': round(float(row.avg_gpa or 0), 2)
+            }
+            for row in grade_stats_rows
+        ]
+
+        # ── Section-wise GPA (for heatmap) ────────────────
+        section_stats_rows = db.query(
+            Student.grade,
+            Student.section,
+            func.count(Student.id).label('total'),
+            func.avg(AcademicRecord.current_gpa).label('avg_gpa'),
+            func.count(
+                case((RiskPrediction.risk_label.in_(
+                    ['High', 'Critical']), 1), else_=None)
+            ).label('at_risk_count')
+        ).outerjoin(
+            latest_acad_subq,
+            Student.id == latest_acad_subq.c.student_id
+        ).outerjoin(
+            AcademicRecord,
+            and_(
+                AcademicRecord.student_id == Student.id,
+                AcademicRecord.id == latest_acad_subq.c.max_id
+            )
+        ).outerjoin(
+            latest_pred_subq,
+            Student.id == latest_pred_subq.c.student_id
+        ).outerjoin(
+            RiskPrediction,
+            and_(
+                RiskPrediction.student_id == Student.id,
+                RiskPrediction.id == latest_pred_subq.c.max_id
+            )
+        ).filter(
+            Student.is_active == True
+        ).group_by(
+            Student.grade, Student.section
+        ).order_by(Student.grade, Student.section).all()
+
+        section_stats = [
+            {
+                'grade':         row.grade,
+                'section':       row.section or 'N/A',
+                'total':         row.total,
+                'avg_gpa':       round(float(row.avg_gpa or 0), 2),
+                'at_risk_count': row.at_risk_count or 0
+            }
+            for row in section_stats_rows
+        ]
+
+        # ── Total counts ───────────────────────────────────
+        total_predictions    = db.query(
+            func.count(RiskPrediction.student_id.distinct())
+        ).scalar()
+
+        total_incidents      = db.query(
+            func.count(BehavioralIncident.id)
+        ).scalar()
+
+        total_communications = db.query(
+            func.count(Communication.id)
+        ).scalar()
+
+        # ── Confidence distribution ────────────────────────
+        conf_buckets = {
+            '90-100%': 0, '75-89%': 0,
+            '60-74%':  0, 'Below 60%': 0
+        }
+        conf_rows = db.query(
+            RiskPrediction.confidence_score
+        ).join(
+            latest_pred_subq,
+            RiskPrediction.id == latest_pred_subq.c.max_id
+        ).all()
+
+        for row in conf_rows:
+            score = float(row.confidence_score or 0)
+            if score >= 90:
+                conf_buckets['90-100%'] += 1
+            elif score >= 75:
+                conf_buckets['75-89%']  += 1
+            elif score >= 60:
+                conf_buckets['60-74%']  += 1
+            else:
+                conf_buckets['Below 60%'] += 1
+
+        db.close()
+
+        return jsonify({
+            "status": "success",
+            "data": {
+                "total_students":       total_students,
+                "total_active":         total_active,
+                "avg_gpa":              avg_gpa,
+                "avg_attendance":       avg_attendance,
+                "risk_distribution":    risk_dist,
+                "grade_stats":          grade_stats,
+                "section_stats":        section_stats,
+                "total_predictions":    total_predictions,
+                "total_incidents":      total_incidents,
+                "total_communications": total_communications,
+                "confidence_distribution": conf_buckets
+            }
+        }), 200
+
+    except Exception as e:
+        db.close()
+        print(f"❌ School overview error: {e}")
+        return jsonify({
+            "status":  "error",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/analytics/trends', methods=['GET'])
+@jwt_required()
+def get_analytics_trends():
+    """
+    Time-series trend data for charts
+    Returns monthly incident counts + communication counts
+    Query param: ?months=6
+    """
+    db = SessionLocal()
+    try:
+        months = request.args.get('months', 6, type=int)
+
+        from datetime import date, timedelta
+        cutoff = date.today() - timedelta(days=months * 30)
+
+        # ── Monthly incident counts ────────────────────────
+        incident_trends = db.query(
+            func.date_trunc('month', BehavioralIncident.incident_date)
+                .label('month'),
+            func.count().label('count')
+        ).filter(
+            BehavioralIncident.incident_date >= cutoff
+        ).group_by('month').order_by('month').all()
+
+        # ── Monthly communication counts ───────────────────
+        comm_trends = db.query(
+            func.date_trunc('month', Communication.sent_at)
+                .label('month'),
+            func.count().label('count')
+        ).filter(
+            Communication.sent_at >= cutoff
+        ).group_by('month').order_by('month').all()
+
+        # ── GPA trend by grade ─────────────────────────────
+        gpa_by_grade = db.query(
+            Student.grade,
+            func.avg(AcademicRecord.current_gpa).label('avg_gpa'),
+            func.min(AcademicRecord.current_gpa).label('min_gpa'),
+            func.max(AcademicRecord.current_gpa).label('max_gpa')
+        ).join(
+            AcademicRecord,
+            AcademicRecord.student_id == Student.id
+        ).filter(
+            Student.is_active == True
+        ).group_by(Student.grade).order_by(Student.grade).all()
+
+        db.close()
+
+        return jsonify({
+            "status": "success",
+            "data": {
+                "incident_trends": [
+                    {
+                        "month": row.month.strftime('%b %Y')
+                                 if row.month else '',
+                        "count": row.count
+                    }
+                    for row in incident_trends
+                ],
+                "comm_trends": [
+                    {
+                        "month": row.month.strftime('%b %Y')
+                                 if row.month else '',
+                        "count": row.count
+                    }
+                    for row in comm_trends
+                ],
+                "gpa_by_grade": [
+                    {
+                        "grade":   row.grade,
+                        "avg_gpa": round(float(row.avg_gpa or 0), 2),
+                        "min_gpa": round(float(row.min_gpa or 0), 2),
+                        "max_gpa": round(float(row.max_gpa or 0), 2)
+                    }
+                    for row in gpa_by_grade
+                ]
+            }
+        }), 200
+
+    except Exception as e:
+        db.close()
+        print(f"❌ Analytics trends error: {e}")
+        return jsonify({
+            "status":  "error",
+            "message": str(e)
+        }), 500
+
+
+
 # ============================================
 # RUN APP
 # ============================================
@@ -1439,3 +2575,7 @@ if __name__ == '__main__':
         app.run(host='0.0.0.0', port=5000, debug=True)
     else:
         print("❌ Database connection failed - Cannot start server!\n")
+
+
+
+

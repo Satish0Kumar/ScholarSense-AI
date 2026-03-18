@@ -17,3 +17,9 @@
 
 *.pdf
 *.pkl
+
+__pycache__/
+*.pyc
+*.pyo
+backend/.env
+backend/database/.env
