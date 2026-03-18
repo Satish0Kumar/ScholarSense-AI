@@ -1,0 +1,19 @@
+﻿# Ignore everything above project folder
+../../../../*
+../../../*
+../../*
+../*
+# Keep only project files
+!.gitignore
+!backend/
+!frontend/
+!data/
+!models/
+!docs/
+!scripts/
+!README.md
+!QUICK_START.md
+!requirements.txt
+
+*.pdf
+*.pkl

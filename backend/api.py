@@ -1,0 +1,1441 @@
+
+"""
+Flask REST API with JWT Authentication
+ScholarSense - AI-Powered Academic Intelligence System
+"""
+import sys
+import os
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+
+from backend.services.attendance_service import AttendanceService
+
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, get_jwt
+from dotenv import load_dotenv
+
+
+from backend.services.student_service import StudentService
+from backend.services.academic_service import AcademicService
+from backend.services.prediction_service import PredictionService  # ← ADD THIS
+
+
+from datetime import datetime, date, timedelta
+
+# Load environment variables
+load_dotenv()
+
+# Import services
+from backend.auth.auth_service import AuthService
+from backend.database.db_config import test_connection, get_database_info
+
+# ... rest of the code stays the same
+
+
+# OTP imports - Enhancement 2
+from backend.services.otp_service import OtpService
+from backend.services.email_service import EmailService
+
+
+# Notification imports - Enhancement 3
+from backend.services.notification_service import NotificationService
+
+
+# PDF imports - Enhancement 4
+from backend.services.pdf_service import PDFService
+from flask import send_file
+
+
+from backend.services.student_service import StudentService
+from backend.services.academic_service import AcademicService  # ← ADD THIS
+
+
+
+
+
+
+
+"""
+Flask REST API with JWT Authentication
+ScholarSense - AI-Powered Academic Intelligence System
+"""
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, get_jwt
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+
+# Import services
+from backend.auth.auth_service import AuthService
+from backend.database.db_config import test_connection, get_database_info
+
+
+from backend.auth.auth_service import AuthService
+from backend.database.db_config import test_connection, get_database_info
+from backend.services.student_service import StudentService  # ← ADD THIS
+
+
+
+# Initialize Flask app
+app = Flask(__name__)
+
+# Configuration
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key')
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES', 28800))  # 8 hours
+
+
+# JWT Additional Config
+app.config['JWT_ALGORITHM'] = 'HS256'
+app.config['PROPAGATE_EXCEPTIONS'] = True
+
+# Debug: Print JWT config
+print(f"\n🔐 JWT Configuration:")
+print(f"   Secret Key Length: {len(app.config['JWT_SECRET_KEY'])} chars")
+print(f"   Token Expiry: {app.config['JWT_ACCESS_TOKEN_EXPIRES']} seconds")
+print(f"   Algorithm: {app.config['JWT_ALGORITHM']}\n")
+
+
+# Enable CORS
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# Initialize JWT
+jwt = JWTManager(app)
+
+# ============================================
+# STARTUP & HEALTH CHECK
+# ============================================
+
+@app.before_request
+def log_request():
+    """Log all incoming requests (for debugging)"""
+    if request.method != 'OPTIONS':
+        print(f"📨 {request.method} {request.path}")
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """
+    Health check endpoint
+    Returns: System status and database info
+    """
+    db_info = get_database_info()
+    
+    return jsonify({
+        'status': 'healthy',
+        'service': 'ScholarSense API',
+        'version': '2.0',
+        'project': os.getenv('PROJECT_NAME', 'ScholarSense'),
+        'database': db_info
+    }), 200
+
+# ============================================
+# AUTHENTICATION ROUTES
+# ============================================
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """
+    MODIFIED: Step 1 of 2FA login
+    Body: {"email": "user@email.com", "password": "password123"}
+    
+    Old behavior: validates credentials → returns JWT
+    New behavior: validates credentials → sends OTP → returns otp_sent status
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        email    = data.get('email')
+        password = data.get('password')
+
+        if not email or not password:
+            return jsonify({'error': 'Email and password required'}), 400
+
+        # ── Step 1: Validate credentials (same as before) ──────────────────
+        result = AuthService.login(email, password)
+
+        if not result:
+            print(f"❌ Login failed: {email}")
+            return jsonify({'error': 'Invalid credentials'}), 401
+
+        # ── Step 2: Credentials valid → Generate OTP ───────────────────────
+        user    = result['user']
+        user_id = user['id']
+
+        otp_data = OtpService.create_otp(user_id)
+
+        if 'error' in otp_data:
+            print(f"❌ OTP generation failed: {otp_data['error']}")
+            return jsonify({'error': 'Failed to generate OTP'}), 500
+
+        # ── Step 3: Send OTP email ──────────────────────────────────────────
+        email_result = EmailService.send_otp_email(
+            to_email  = user['email'],
+            user_name = user['full_name'],
+            otp_code  = otp_data['otp_code']
+        )
+
+        if email_result['status'] == 'failed':
+            print(f"❌ OTP email failed: {email_result['message']}")
+            return jsonify({
+                'error': 'Failed to send OTP email. '
+                         'Please check email configuration.'
+            }), 500
+
+        # ── Step 4: Return OTP sent status (NOT the JWT token yet) ─────────
+        masked_email = OtpService.mask_email(user['email'])
+        print(f"✅ OTP sent to {user['email']} for user {user_id}")
+
+        return jsonify({
+            'status' : 'otp_sent',
+            'message': f'OTP sent to {masked_email}',
+            'user_id': user_id,
+            'email'  : masked_email
+        }), 200
+
+    except Exception as e:
+        print(f"❌ Login error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+# ============================================
+# OTP VERIFICATION ROUTES - Enhancement 2
+# ============================================
+
+@app.route('/api/auth/verify-otp', methods=['POST'])
+def verify_otp():
+    """
+    Step 2 of 2FA login - Verify OTP and return JWT token
+    Body: {"user_id": 1, "otp": "847392"}
+    Returns: JWT token + user info (same as old login response)
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        user_id      = data.get('user_id')
+        entered_otp  = data.get('otp', '').strip()
+
+        if not user_id or not entered_otp:
+            return jsonify({'error': 'user_id and otp are required'}), 400
+
+        if len(entered_otp) != 6 or not entered_otp.isdigit():
+            return jsonify({'error': 'OTP must be exactly 6 digits'}), 400
+
+        # ── Verify OTP ──────────────────────────────────────────────────────
+        verify_result = OtpService.verify_otp(user_id, entered_otp)
+
+        if verify_result['status'] == 'locked':
+            print(f"🔒 User {user_id} is locked out")
+            return jsonify({'error': verify_result['message']}), 429
+
+        if verify_result['status'] == 'expired':
+            return jsonify({'error': verify_result['message']}), 401
+
+        if verify_result['status'] == 'invalid':
+            return jsonify({
+                'error'    : verify_result['message'],
+                'remaining': verify_result.get('remaining', 0)
+            }), 401
+
+        if verify_result['status'] == 'error':
+            return jsonify({'error': verify_result['message']}), 500
+
+        # ── OTP Valid → Generate JWT token ──────────────────────────────────
+        token_result = AuthService.generate_token_for_user(user_id)
+
+        if not token_result:
+            return jsonify({'error': 'Failed to generate token'}), 500
+
+        print(f"✅ 2FA login complete for user {user_id}")
+        return jsonify(token_result), 200
+
+    except Exception as e:
+        print(f"❌ OTP verify error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/auth/resend-otp', methods=['POST'])
+def resend_otp():
+    """
+    Resend OTP to user's email
+    Body: {"user_id": 1}
+    Returns: success message
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        user_id = data.get('user_id')
+
+        if not user_id:
+            return jsonify({'error': 'user_id is required'}), 400
+
+        # ── Get user details ────────────────────────────────────────────────
+        user = AuthService.get_user_by_id(user_id)
+
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # ── Generate new OTP ────────────────────────────────────────────────
+        otp_data = OtpService.create_otp(user_id)
+
+        if 'error' in otp_data:
+            return jsonify({'error': 'Failed to generate OTP'}), 500
+
+        # ── Send OTP email ──────────────────────────────────────────────────
+        email_result = EmailService.send_otp_email(
+            to_email  = user['email'],
+            user_name = user['full_name'],
+            otp_code  = otp_data['otp_code']
+        )
+
+        if email_result['status'] == 'failed':
+            return jsonify({'error': 'Failed to send OTP email'}), 500
+
+        masked_email = OtpService.mask_email(user['email'])
+        print(f"✅ OTP resent to {user['email']} for user {user_id}")
+
+        return jsonify({
+            'status' : 'otp_sent',
+            'message': f'New OTP sent to {masked_email}',
+            'email'  : masked_email
+        }), 200
+
+    except Exception as e:
+        print(f"❌ Resend OTP error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/auth/bypass-otp', methods=['POST'])
+def bypass_otp():
+    """
+    DEVELOPMENT ONLY - Login without OTP for testing
+    Remove this endpoint before production deployment!
+    Body: {"email": "admin@scholarsense.com", "password": "admin123"}
+    Returns: JWT token directly
+    """
+    try:
+        if os.getenv('FLASK_ENV') != 'development':
+            return jsonify({'error': 'Not available in production'}), 403
+
+        data     = request.get_json()
+        email    = data.get('email')
+        password = data.get('password')
+
+        result = AuthService.login(email, password)
+
+        if result:
+            print(f"⚠️  Bypass OTP login: {email}")
+            return jsonify(result), 200
+
+        return jsonify({'error': 'Invalid credentials'}), 401
+
+    except Exception as e:
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+
+
+
+@app.route('/api/auth/verify', methods=['GET'])
+@jwt_required()
+def verify_token():
+    """
+    Verify JWT token and return current user
+    Headers: Authorization: Bearer <token>
+    Returns: Current user info
+    """
+    try:
+        user = AuthService.get_current_user()
+        if user:
+            return jsonify(user), 200
+        return jsonify({'error': 'User not found'}), 404
+    except Exception as e:
+        print(f"❌ Verify error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """
+    Logout endpoint (client should delete token)
+    Headers: Authorization: Bearer <token>
+    """
+    try:
+        user_id = get_jwt_identity()
+        print(f"📤 User {user_id} logged out")
+        return jsonify({'message': 'Logged out successfully'}), 200
+    except Exception as e:
+        print(f"❌ Logout error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/auth/me', methods=['GET'])
+@jwt_required()
+def get_current_user_info():
+    """
+    Get current authenticated user info
+    Headers: Authorization: Bearer <token>
+    Returns: User information
+    """
+    try:
+        user = AuthService.get_current_user()
+        if user:
+            return jsonify(user), 200
+        return jsonify({'error': 'User not found'}), 404
+    except Exception as e:
+        print(f"❌ Get user error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+# ============================================
+# USER MANAGEMENT ROUTES (Admin only)
+# ============================================
+
+@app.route('/api/users', methods=['GET'])
+@jwt_required()
+def get_all_users():
+    """
+    Get all users (admin only)
+    Headers: Authorization: Bearer <token>
+    Returns: List of all users
+    """
+    try:
+        # Check if admin
+        claims = get_jwt()
+        if claims.get('role') != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        users = AuthService.get_all_users()
+        return jsonify(users), 200
+    except Exception as e:
+        print(f"❌ Get users error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/users/create', methods=['POST'])
+@jwt_required()
+def create_user():
+    """
+    Create new user (admin only)
+    Headers: Authorization: Bearer <token>
+    Body: {"username": "...", "email": "...", "password": "...", "full_name": "...", "role": "teacher"}
+    Returns: Created user info
+    """
+    try:
+        # Check if admin
+        claims = get_jwt()
+        if claims.get('role') != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        data = request.get_json()
+        required = ['username', 'email', 'password', 'full_name', 'role']
+        
+        if not all(key in data for key in required):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        result = AuthService.create_user(
+            username=data['username'],
+            email=data['email'],
+            password=data['password'],
+            full_name=data['full_name'],
+            role=data['role']
+        )
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        print(f"✅ User created: {result['email']}")
+        return jsonify(result), 201
+    
+    except Exception as e:
+        print(f"❌ Create user error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+
+
+# ============================================
+# STUDENT MANAGEMENT ROUTES
+# ============================================
+
+@app.route('/api/students', methods=['GET'])
+@jwt_required()
+def get_students():
+    """
+    Get all students with optional filters
+    Query params: ?grade=10&section=A&search=name
+    Returns: List of students
+    """
+    try:
+        # Get query parameters
+        grade = request.args.get('grade', type=int)
+        section = request.args.get('section')
+        search = request.args.get('search')
+        
+        if search:
+            # Search students
+            students = StudentService.search_students(search)
+        else:
+            # Get all students with filters
+            students = StudentService.get_all_students(grade=grade, section=section)
+        
+        return jsonify(students), 200
+    except Exception as e:
+        print(f"❌ Get students error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/students/count', methods=['GET'])
+@jwt_required()
+def get_students_count():
+    """
+    Get total student count
+    Query params: ?grade=10
+    Returns: Count of students
+    """
+    try:
+        grade = request.args.get('grade', type=int)
+        result = StudentService.get_students_count(grade=grade)
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"❌ Get students count error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/students/<int:student_id>', methods=['GET'])
+@jwt_required()
+def get_student(student_id):
+    """
+    Get specific student by ID
+    Returns: Student info
+    """
+    try:
+        student = StudentService.get_student(student_id)
+        
+        if 'error' in student:
+            return jsonify(student), 404
+        
+        return jsonify(student), 200
+    except Exception as e:
+        print(f"❌ Get student error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/students/<int:student_id>/details', methods=['GET'])
+@jwt_required()
+def get_student_details(student_id):
+    """
+    Get student with all related records (academic, attendance, predictions)
+    Returns: Student info with all records
+    """
+    try:
+        student = StudentService.get_student_with_records(student_id)
+        
+        if 'error' in student:
+            return jsonify(student), 404
+        
+        return jsonify(student), 200
+    except Exception as e:
+        print(f"❌ Get student details error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/students', methods=['POST'])
+@jwt_required()
+def create_student():
+    """
+    Create new student
+    Body: Student data (see StudentService for required fields)
+    Returns: Created student info
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Required fields
+        required = ['student_id', 'first_name', 'last_name', 'grade']
+        if not all(field in data for field in required):
+            return jsonify({'error': 'Missing required fields: student_id, first_name, last_name, grade'}), 400
+        
+        result = StudentService.create_student(data)
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        print(f"✅ Student created: {result['student_id']} - {result['first_name']} {result['last_name']}")
+        return jsonify(result), 201
+    except Exception as e:
+        print(f"❌ Create student error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/students/<int:student_id>', methods=['PUT'])
+@jwt_required()
+def update_student(student_id):
+    """
+    Update student information
+    Body: Fields to update
+    Returns: Updated student info
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        result = StudentService.update_student(student_id, data)
+        
+        if 'error' in result:
+            return jsonify(result), 404
+        
+        print(f"✅ Student updated: ID {student_id}")
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"❌ Update student error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/students/<int:student_id>', methods=['DELETE'])
+@jwt_required()
+def delete_student(student_id):
+    """
+    Delete or deactivate student
+    Query param: ?permanent=true for hard delete
+    Returns: Success message
+    """
+    try:
+        # Check if admin (only admins can delete)
+        claims = get_jwt()
+        if claims.get('role') != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        permanent = request.args.get('permanent', 'false').lower() == 'true'
+        soft_delete = not permanent
+        
+        result = StudentService.delete_student(student_id, soft_delete=soft_delete)
+        
+        if 'error' in result:
+            return jsonify(result), 404
+        
+        print(f"✅ Student {'deactivated' if soft_delete else 'deleted'}: ID {student_id}")
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"❌ Delete student error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+
+
+# ============================================
+# ACADEMIC RECORDS ROUTES
+# ============================================
+
+@app.route('/api/students/<int:student_id>/academics', methods=['GET'])
+@jwt_required()
+def get_student_academics(student_id):
+    """
+    Get all academic records for a student
+    Returns: List of academic records
+    """
+    try:
+        records = AcademicService.get_student_academic_records(student_id)
+        return jsonify(records), 200
+    except Exception as e:
+        print(f"❌ Get academics error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/students/<int:student_id>/academics/latest', methods=['GET'])
+@jwt_required()
+def get_student_latest_academic(student_id):
+    """
+    Get latest academic record for a student
+    Returns: Latest academic record
+    """
+    try:
+        record = AcademicService.get_latest_academic_record(student_id)
+        
+        if 'error' in record:
+            return jsonify(record), 404
+        
+        return jsonify(record), 200
+    except Exception as e:
+        print(f"❌ Get latest academic error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/academics', methods=['POST'])
+@jwt_required()
+def create_academic_record():
+    """
+    Create academic record
+    Body: Academic data (student_id, semester, scores, etc.)
+    Returns: Created academic record
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Required fields
+        required = ['student_id', 'semester', 'current_gpa']
+        if not all(field in data for field in required):
+            return jsonify({'error': 'Missing required fields: student_id, semester, current_gpa'}), 400
+        
+        result = AcademicService.create_academic_record(data)
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        print(f"✅ Academic record created: Student {result['student_id']} - {result['semester']}")
+
+        # ── Auto-trigger parent notification ───────────────────────────────
+        try:
+            notif_results = NotificationService.check_and_notify_academic(
+                student_id         = result['student_id'],
+                academic_record_id = result.get('id')
+            )
+            print(f"📨 Notification check: {notif_results}")
+        except Exception as notif_err:
+            print(f"⚠️  Notification error (non-critical): {notif_err}")
+
+        return jsonify(result), 201
+
+    except Exception as e:
+        print(f"❌ Create academic record error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/academics/<int:record_id>', methods=['GET'])
+@jwt_required()
+def get_academic_record(record_id):
+    """
+    Get specific academic record by ID
+    Returns: Academic record
+    """
+    try:
+        record = AcademicService.get_academic_record(record_id)
+        
+        if 'error' in record:
+            return jsonify(record), 404
+        
+        return jsonify(record), 200
+    except Exception as e:
+        print(f"❌ Get academic record error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/academics/<int:record_id>', methods=['PUT'])
+@jwt_required()
+def update_academic_record(record_id):
+    """
+    Update academic record
+    Body: Fields to update
+    Returns: Updated academic record
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        result = AcademicService.update_academic_record(record_id, data)
+        
+        if 'error' in result:
+            return jsonify(result), 404
+        
+        print(f"✅ Academic record updated: ID {record_id}")
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"❌ Update academic record error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/academics/<int:record_id>', methods=['DELETE'])
+@jwt_required()
+def delete_academic_record(record_id):
+    """
+    Delete academic record (Admin only)
+    Returns: Success message
+    """
+    try:
+        # Check if admin
+        claims = get_jwt()
+        if claims.get('role') != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        result = AcademicService.delete_academic_record(record_id)
+        
+        if 'error' in result:
+            return jsonify(result), 404
+        
+        print(f"✅ Academic record deleted: ID {record_id}")
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"❌ Delete academic record error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+
+
+# ============================================
+# RISK PREDICTION ROUTES
+# ============================================
+
+@app.route('/api/students/<int:student_id>/predict', methods=['POST'])
+@jwt_required()
+def predict_student_risk(student_id):
+    """
+    Make risk prediction for a student
+    Returns: Prediction result with probabilities
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        
+        result = PredictionService.make_prediction(student_id, predicted_by=user_id)
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        print(f"✅ Prediction made for student {student_id}: {result['risk_label']} ({result['confidence_score']:.1f}%)")
+
+        # ── Auto-trigger high risk notification ─────────────────────────────
+        try:
+            notif_result = NotificationService.check_and_notify_risk(
+                student_id    = student_id,
+                prediction_id = result.get('id'),
+                risk_label    = result.get('risk_label', 'Low')
+            )
+            print(f"📨 Risk notification: {notif_result}")
+        except Exception as notif_err:
+            print(f"⚠️  Risk notification error (non-critical): {notif_err}")
+
+        return jsonify(result), 201
+
+    except Exception as e:
+        print(f"❌ Prediction error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/students/<int:student_id>/predictions', methods=['GET'])
+@jwt_required()
+def get_student_prediction_history(student_id):
+    """
+    Get prediction history for a student
+    Query param: ?limit=10
+    Returns: List of predictions
+    """
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        predictions = PredictionService.get_student_predictions(student_id, limit=limit)
+        return jsonify(predictions), 200
+    except Exception as e:
+        print(f"❌ Get predictions error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/students/<int:student_id>/predictions/latest', methods=['GET'])
+@jwt_required()
+def get_student_latest_prediction(student_id):
+    """
+    Get latest prediction for a student
+    Returns: Latest prediction
+    """
+    try:
+        prediction = PredictionService.get_latest_prediction(student_id)
+        
+        if 'error' in prediction:
+            return jsonify(prediction), 404
+        
+        return jsonify(prediction), 200
+    except Exception as e:
+        print(f"❌ Get latest prediction error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/predictions/high-risk', methods=['GET'])
+@jwt_required()
+def get_high_risk_students():
+    """
+    Get list of high-risk students
+    Query param: ?grade=10
+    Returns: List of students with high/critical risk
+    """
+    try:
+        grade = request.args.get('grade', type=int)
+        students = PredictionService.get_high_risk_students(grade=grade)
+        return jsonify(students), 200
+    except Exception as e:
+        print(f"❌ Get high-risk students error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+
+
+
+# ============================================
+# JWT ERROR HANDLERS (with debug info)
+# ============================================
+
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    print(f"❌ JWT Error: Token expired")
+    print(f"   Header: {jwt_header}")
+    print(f"   Payload: {jwt_payload}")
+    return jsonify({'error': 'Token has expired'}), 401
+
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    print(f"❌ JWT Error: Invalid token - {error}")
+    return jsonify({'error': 'Invalid token', 'details': str(error)}), 401
+
+@jwt.unauthorized_loader
+def missing_token_callback(error):
+    print(f"❌ JWT Error: Missing token - {error}")
+    return jsonify({'error': 'Authorization token required'}), 401
+
+@jwt.token_verification_failed_loader
+def token_verification_failed_callback(jwt_header, jwt_payload):
+    print(f"❌ JWT Error: Token verification failed")
+    print(f"   Header: {jwt_header}")
+    print(f"   Payload: {jwt_payload}")
+    return jsonify({'error': 'Token verification failed'}), 401
+
+# ============================================
+# STARTUP MESSAGE
+# ============================================
+
+def print_startup_message():
+    """Print startup information"""
+    print("\n" + "=" * 70)
+    print("🎓 SCHOLARSENSE - AI-POWERED ACADEMIC INTELLIGENCE SYSTEM")
+    print("=" * 70)
+    print(f"📡 API Server: http://localhost:5000")
+    print(f"🔐 Authentication: JWT (1 hour tokens)")
+    print(f"💾 Database: PostgreSQL")
+    print(f"🌐 CORS: Enabled")
+    print(f"🤖 ML Model: {'Loaded' if PredictionService.model else 'Using dummy predictions'}")
+    print("\n📚 Available Endpoints:")
+    print("   Authentication:")
+    print("   └─ POST /api/auth/login           - User login")
+    print("   └─ GET  /api/auth/verify          - Verify token")
+    print("   └─ GET  /api/auth/me              - Get current user")
+    print("\n   User Management (Admin):")
+    print("   └─ GET  /api/users                - Get all users")
+    print("   └─ POST /api/users/create         - Create user")
+    print("\n   Student Management:")
+    print("   └─ GET    /api/students           - Get all students")
+    print("   └─ GET    /api/students/{id}      - Get student")
+    print("   └─ POST   /api/students           - Create student")
+    print("   └─ PUT    /api/students/{id}      - Update student")
+    print("   └─ DELETE /api/students/{id}      - Delete student")
+    print("\n   Academic Records:")
+    print("   └─ GET  /api/students/{id}/academics        - Get student academics")
+    print("   └─ GET  /api/students/{id}/academics/latest - Get latest record")
+    print("   └─ POST /api/academics                      - Create record")
+    print("   └─ PUT  /api/academics/{id}                 - Update record")
+    print("\n   Risk Predictions (ML):")
+    print("   └─ POST /api/students/{id}/predict          - Make prediction")
+    print("   └─ GET  /api/students/{id}/predictions      - Get history")
+    print("   └─ GET  /api/students/{id}/predictions/latest - Latest prediction")
+    print("   └─ GET  /api/predictions/high-risk          - High-risk students")
+    print("\n   System:")
+    print("   └─ GET  /api/health               - Health check")
+    print("\n   PDF Reports (Enhancement 4):")
+    print("   └─ GET /api/reports/student/{id}  - Student PDF report")
+    print("   └─ GET /api/reports/grade/{grade} - Grade wise PDF report")
+    print("   └─ GET /api/reports/atrisk        - At-risk students PDF")
+    print("   └─ GET /api/reports/preview/student/{id} - Preview in browser")
+
+    print("\n   Notifications (Enhancement 3):")
+    print("   └─ GET  /api/notifications              - All notifications")
+    print("   └─ GET  /api/notifications/stats        - Notification stats")
+    print("   └─ GET  /api/students/{id}/notifications - Student notifications")
+    print("   └─ POST /api/students/{id}/notify       - Manual notify parent")
+    print("   └─ POST /api/students/{id}/notify/check - Auto-check & notify")
+    print("   └─ POST /api/notifications/bulk-check   - Bulk check all students")
+
+    print("\n🔑 Test Credentials:")
+    print("   Admin:   admin@scholarsense.com / admin123")
+    print("   Teacher: teacher@scholarsense.com / teacher123")
+    print("=" * 70 + "\n")
+
+
+
+
+
+
+# ============================================
+# ATTENDANCE ENDPOINTS
+# ============================================
+
+@app.route('/api/attendance/mark', methods=['POST'])
+@jwt_required()
+def mark_attendance():
+    """Mark attendance for a student"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required = ['student_id', 'date', 'status']
+        if not all(field in data for field in required):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        current_user = get_jwt_identity()
+        
+        result = AttendanceService.mark_attendance(
+            student_id=data['student_id'],
+            attendance_date=datetime.strptime(data['date'], '%Y-%m-%d').date(),
+            status=data['status'],
+            remarks=data.get('remarks'),
+            marked_by=current_user
+        )
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/attendance/bulk', methods=['POST'])
+@jwt_required()
+def mark_bulk_attendance():
+    """Mark attendance for multiple students"""
+    try:
+        data = request.get_json()
+        attendance_list = data.get('attendance_list', [])
+        
+        if not attendance_list:
+            return jsonify({'error': 'No attendance data provided'}), 400
+        
+        current_user = get_jwt_identity()
+        
+        result = AttendanceService.mark_bulk_attendance(
+            attendance_list=attendance_list,
+            marked_by=current_user
+        )
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/students/<int:student_id>/attendance', methods=['GET'])
+@jwt_required()
+def get_student_attendance(student_id):
+    """Get attendance records for a student"""
+    try:
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        if start_date:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+        if end_date:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        
+        records = AttendanceService.get_student_attendance(
+            student_id=student_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        return jsonify(records), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/students/<int:student_id>/attendance/stats', methods=['GET'])
+@jwt_required()
+def get_attendance_stats(student_id):
+    """Get attendance statistics for a student"""
+    try:
+        days = int(request.args.get('days', 30))
+        
+        stats = AttendanceService.get_attendance_stats(
+            student_id=student_id,
+            days=days
+        )
+        
+        return jsonify(stats), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+
+@app.route('/api/attendance/daily', methods=['GET'])
+@jwt_required()
+def get_daily_attendance():
+    """Get attendance for all students on a specific date"""
+    try:
+        date_str = request.args.get('date')
+        grade_str = request.args.get('grade')
+        section = request.args.get('section')
+        
+        if not date_str:
+            return jsonify({'error': 'Date parameter required'}), 400
+        
+        attendance_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        # Convert grade to int or None
+        grade = None
+        if grade_str and grade_str != 'None':
+            try:
+                grade = int(grade_str)
+            except:
+                grade = None
+        
+        # Handle section
+        if section == 'None' or not section:
+            section = None
+        
+        print(f"🔍 API Endpoint: date={attendance_date}, grade={grade}, section={section}")  # Debug
+        
+        results = AttendanceService.get_daily_attendance(
+            attendance_date=attendance_date,
+            grade=grade,
+            section=section
+        )
+        
+        print(f"✅ API Endpoint: Returning {len(results)} students")  # Debug
+        
+        return jsonify(results), 200
+    except Exception as e:
+        print(f"❌ API Endpoint Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/attendance/low-attendance', methods=['GET'])
+@jwt_required()
+def get_low_attendance_students_endpoint():
+    """Get students with low attendance"""
+    try:
+        threshold = float(request.args.get('threshold', 75.0))
+        days = int(request.args.get('days', 30))
+        
+        results = AttendanceService.get_low_attendance_students(
+            threshold=threshold,
+            days=days
+        )
+        
+        return jsonify(results), 200
+    except Exception as e:
+        print(f"❌ Low attendance endpoint error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+
+# ================================================================
+# NOTIFICATION ROUTES - Enhancement 3
+# ================================================================
+
+@app.route('/api/notifications', methods=['GET'])
+@jwt_required()
+def get_notifications():
+    """Get recent notifications across all students"""
+    try:
+        limit         = request.args.get('limit', 50, type=int)
+        notifications = NotificationService.get_recent_notifications(limit=limit)
+        return jsonify(notifications), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/notifications/stats', methods=['GET'])
+@jwt_required()
+def get_notification_stats():
+    """Get notification statistics for dashboard"""
+    try:
+        stats = NotificationService.get_notification_stats()
+        return jsonify(stats), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/students/<int:student_id>/notifications', methods=['GET'])
+@jwt_required()
+def get_student_notifications(student_id):
+    """Get notification history for a specific student"""
+    try:
+        limit         = request.args.get('limit', 20, type=int)
+        notifications = NotificationService.get_student_notifications(
+            student_id = student_id,
+            limit      = limit
+        )
+        return jsonify(notifications), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/students/<int:student_id>/notify', methods=['POST'])
+@jwt_required()
+def send_manual_notification(student_id):
+    """
+    Manually send notification to student's parent.
+    Body: {"notification_type": "low_gpa", "message": "Custom message"}
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        notification_type = data.get('notification_type', 'high_risk')
+        message           = data.get('message', '')
+
+        if not message:
+            return jsonify({'error': 'Message is required'}), 400
+
+        valid_types = ['low_gpa', 'high_risk', 'low_attendance', 'failed_subjects']
+        if notification_type not in valid_types:
+            return jsonify({
+                'error': f'Invalid type. Must be one of: {valid_types}'
+            }), 400
+
+        result = NotificationService.send_manual_notification(
+            student_id        = student_id,
+            notification_type = notification_type,
+            custom_message    = message
+        )
+
+        if result['status'] == 'sent':
+            return jsonify(result), 200
+        else:
+            return jsonify({'error': result.get('message', 'Send failed')}), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/students/<int:student_id>/notify/check', methods=['POST'])
+@jwt_required()
+def check_and_notify_student(student_id):
+    """
+    Manually trigger academic check for a specific student.
+    Sends notifications if any conditions are met.
+    """
+    try:
+        results = NotificationService.check_and_notify_academic(
+            student_id = student_id
+        )
+
+        sent    = [r for r in results if r.get('status') == 'sent']
+        failed  = [r for r in results if r.get('status') == 'failed']
+        skipped = [r for r in results if r.get('status') in
+                   ('no_trigger', 'skipped', 'cooldown')]
+
+        return jsonify({
+            'student_id'   : student_id,
+            'total_checked': len(results),
+            'sent'         : len(sent),
+            'failed'       : len(failed),
+            'skipped'      : len(skipped),
+            'results'      : results
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/notifications/bulk-check', methods=['POST'])
+@jwt_required()
+def bulk_notification_check():
+    """
+    Run notification check for ALL active students.
+    Body (optional): {"grade": 9, "section": "A"}
+    """
+    try:
+        data    = request.get_json() or {}
+        grade   = data.get('grade')
+        section = data.get('section')
+
+        from backend.database.db_config import SessionLocal
+        from backend.database.models import Student as StudentModel
+
+        db = SessionLocal()
+        try:
+            query = db.query(StudentModel).filter(
+                StudentModel.is_active == True
+            )
+            if grade:
+                query = query.filter(StudentModel.grade == grade)
+            if section:
+                query = query.filter(StudentModel.section == section)
+            students = query.all()
+            total    = len(students)
+        finally:
+            db.close()
+
+        print(f"🔄 Bulk notification check: {total} students")
+
+        summary = {
+            'total_students': total,
+            'sent'          : 0,
+            'failed'        : 0,
+            'no_trigger'    : 0,
+            'skipped'       : 0
+        }
+
+        for student in students:
+            results = NotificationService.check_and_notify_academic(
+                student_id = student.id
+            )
+            for r in results:
+                status = r.get('status', 'skipped')
+                if   status == 'sent'      : summary['sent']       += 1
+                elif status == 'failed'    : summary['failed']     += 1
+                elif status == 'no_trigger': summary['no_trigger'] += 1
+                else                       : summary['skipped']    += 1
+
+        print(f"✅ Bulk check complete: {summary}")
+        return jsonify(summary), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+
+
+# ================================================================
+# PDF REPORT ROUTES - Enhancement 4
+# ================================================================
+
+@app.route('/api/reports/student/<int:student_id>', methods=['GET'])
+@jwt_required()
+def download_student_report(student_id):
+    """
+    Download individual student PDF report.
+    Returns: PDF file download
+    """
+    try:
+        pdf_bytes = PDFService.generate_student_report(student_id)
+
+        buffer = __import__('io').BytesIO(pdf_bytes)
+        buffer.seek(0)
+
+        filename = f"student_{student_id}_report_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+        return send_file(
+            buffer,
+            mimetype             = 'application/pdf',
+            as_attachment        = True,
+            download_name        = filename
+        )
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        print(f"❌ Student PDF error: {e}")
+        return jsonify({'error': 'Failed to generate PDF'}), 500
+
+
+@app.route('/api/reports/grade/<int:grade>', methods=['GET'])
+@jwt_required()
+def download_grade_report(grade):
+    """
+    Download grade/class wise PDF report.
+    Query param: ?section=A (optional)
+    Returns: PDF file download
+    """
+    try:
+        section = request.args.get('section')
+        if section in ('None', 'All', ''):
+            section = None
+
+        pdf_bytes = PDFService.generate_grade_report(grade, section)
+
+        buffer = __import__('io').BytesIO(pdf_bytes)
+        buffer.seek(0)
+
+        sec_str  = f"_sec{section}" if section else ""
+        filename = f"grade{grade}{sec_str}_report_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+        return send_file(
+            buffer,
+            mimetype      = 'application/pdf',
+            as_attachment = True,
+            download_name = filename
+        )
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        print(f"❌ Grade PDF error: {e}")
+        return jsonify({'error': 'Failed to generate PDF'}), 500
+
+
+@app.route('/api/reports/atrisk', methods=['GET'])
+@jwt_required()
+def download_atrisk_report():
+    """
+    Download at-risk students PDF report.
+    Query param: ?grade=9 (optional)
+    Returns: PDF file download
+    """
+    try:
+        grade = request.args.get('grade', type=int)
+
+        pdf_bytes = PDFService.generate_atrisk_report(grade=grade)
+
+        buffer = __import__('io').BytesIO(pdf_bytes)
+        buffer.seek(0)
+
+        grade_str = f"_grade{grade}" if grade else "_all_grades"
+        filename  = f"atrisk{grade_str}_report_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+        return send_file(
+            buffer,
+            mimetype      = 'application/pdf',
+            as_attachment = True,
+            download_name = filename
+        )
+
+    except Exception as e:
+        print(f"❌ At-risk PDF error: {e}")
+        return jsonify({'error': 'Failed to generate PDF'}), 500
+
+
+@app.route('/api/reports/preview/student/<int:student_id>', methods=['GET'])
+@jwt_required()
+def preview_student_report(student_id):
+    """
+    Preview individual student PDF in browser (no download).
+    Returns: PDF inline view
+    """
+    try:
+        pdf_bytes = PDFService.generate_student_report(student_id)
+
+        buffer = __import__('io').BytesIO(pdf_bytes)
+        buffer.seek(0)
+
+        return send_file(
+            buffer,
+            mimetype      = 'application/pdf',
+            as_attachment = False
+        )
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        print(f"❌ Preview PDF error: {e}")
+        return jsonify({'error': 'Failed to generate PDF'}), 500
+
+
+
+
+# ============================================
+# RUN APP
+# ============================================
+
+if __name__ == '__main__':
+    print_startup_message()
+    
+    # Test database connection
+    if test_connection():
+        print("✅ Database connected - Starting server...\n")
+        app.run(host='0.0.0.0', port=5000, debug=True)
+    else:
+        print("❌ Database connection failed - Cannot start server!\n")
