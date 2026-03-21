@@ -465,6 +465,53 @@ def create_user():
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@jwt_required()
+def delete_user(user_id):
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'message': 'Admin access required'}), 403
+    try:
+        from backend.database.dbconfig import SessionLocal
+        from backend.database.models import User
+        db = SessionLocal()
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            db.close()
+            return jsonify({'message': 'User not found'}), 404
+        db.delete(user)
+        db.commit()
+        db.close()
+        print(f"🗑️ User deleted: ID {user_id}")
+        return jsonify({'message': 'User deleted successfully'}), 200
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+@jwt_required()
+def update_user_status(user_id):
+    claims = get_jwt()
+    if claims.get('role') != 'admin':
+        return jsonify({'message': 'Admin access required'}), 403
+    data = request.get_json()
+    try:
+        from backend.database.dbconfig import SessionLocal
+        from backend.database.models import User
+        db = SessionLocal()
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            db.close()
+            return jsonify({'message': 'User not found'}), 404
+        user.is_active = data.get('is_active', True)
+        db.commit()
+        db.close()
+        print(f"✅ User {user_id} status updated to {user.is_active}")
+        return jsonify({'message': 'User updated successfully'}), 200
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+
+
+
 
 
 # ============================================
@@ -870,6 +917,8 @@ def get_high_risk_students():
     except Exception as e:
         print(f"❌ Get high-risk students error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+
 
 
 
