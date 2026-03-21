@@ -303,12 +303,19 @@ with col_right:
     if students:
         risk_counts = {'Low': 0, 'Medium': 0, 'High': 0, 'Critical': 0}
         
-        for student in students[:10]:
-            details = APIClient.get_student_details(student['id'])
-            if details and 'latest_risk_prediction' in details and details['latest_risk_prediction']:
-                risk_label = details['latest_risk_prediction'].get('risk_label', 'Low')
-                risk_counts[risk_label] = risk_counts.get(risk_label, 0) + 1
-        
+        @st.cache_data(ttl=300)  # cache for 5 minutes
+        def get_risk_distribution(student_ids):
+            risk_counts = {'Low': 0, 'Medium': 0, 'High': 0, 'Critical': 0}
+            for sid in student_ids[:10]:
+                details = APIClient.get_student_details(sid)
+                if details and details.get('latest_risk_prediction'):
+                    label = details['latest_risk_prediction'].get('risk_label', 'Low')
+                    risk_counts[label] = risk_counts.get(label, 0) + 1
+            return risk_counts
+
+        student_ids = [s['id'] for s in students]
+        risk_counts = get_risk_distribution(tuple(student_ids))
+
         fig = go.Figure(data=[go.Pie(
             labels=list(risk_counts.keys()),
             values=list(risk_counts.values()),
