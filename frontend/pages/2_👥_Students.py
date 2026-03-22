@@ -14,6 +14,19 @@ from frontend.utils.session_manager import SessionManager
 from frontend.utils.api_client import APIClient
 import pandas as pd
 
+# Pagination
+PAGE_SIZE = 10
+
+
+@st.cache_data(ttl=300)
+def fetch_students_cached(_token, grade=None, section=None, search=None):
+    """Cache student list for 5 minutes"""
+    if search:
+        return APIClient.get_students(search=search)
+    return APIClient.get_students(grade=grade, section=section)
+
+
+
 # Page config
 st.set_page_config(
     page_title="Students - ScholarSense",
@@ -92,15 +105,25 @@ with col4:
     if st.button("🔄 Reset Filters", use_container_width=True):
         st.rerun()
 
+# Reset page to 1 whenever filters change
+filter_key = f"{search}_{grade_filter}_{section_filter}"
+if st.session_state.get('_last_filter_key') != filter_key:
+    st.session_state['page_num'] = 1
+    st.session_state['_last_filter_key'] = filter_key
+
+
 # Fetch students
 with st.spinner("Loading students..."):
-    grade = None if grade_filter == "All" else grade_filter
+    grade   = None if grade_filter == "All" else grade_filter
     section = None if section_filter == "All" else section_filter
-    
-    if search:
-        students = APIClient.get_students(search=search)
-    else:
-        students = APIClient.get_students(grade=grade, section=section)
+    token   = st.session_state.get('token', '')
+
+    students = fetch_students_cached(
+        _token  = token,
+        grade   = grade,
+        section = section,
+        search  = search if search else None
+    )
 
 # Stats
 col1, col2 = st.columns([3, 1])
@@ -161,36 +184,74 @@ if st.session_state.get('show_add_form', False):
                     if 'error' not in result:
                         st.success(f"✅ Student created: {result['student_id']}")
                         st.session_state['show_add_form'] = False
+                        st.cache_data.clear()  # ← Force fresh data
                         st.rerun()
                     else:
                         st.error(f"❌ {result['error']}")
 
-# Students list
+# Students list with pagination
 if students:
-    for student in students:
+    # ── Pagination calculations ──────────────────────────
+    total_students = len(students)
+    total_pages    = max(1, -(-total_students // PAGE_SIZE))  # ceiling division
+    page_num       = st.session_state.get('page_num', 1)
+    page_num       = max(1, min(page_num, total_pages))       # clamp within range
+
+    start_idx = (page_num - 1) * PAGE_SIZE
+    end_idx   = start_idx + PAGE_SIZE
+    page_students = students[start_idx:end_idx]
+
+    # ── Render current page students ─────────────────────
+    for student in page_students:
         col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
-        
+
         with col1:
             st.markdown(f'<p class="student-name">{student["first_name"]} {student["last_name"]}</p>', unsafe_allow_html=True)
             st.markdown(f'<p class="student-info">ID: {student["student_id"]}</p>', unsafe_allow_html=True)
-        
+
         with col2:
             st.markdown(f'<p class="student-info">Grade: {student.get("grade", "N/A")}-{student.get("section", "N/A")}</p>', unsafe_allow_html=True)
             st.markdown(f'<p class="student-info">Age: {student.get("age", "N/A")}</p>', unsafe_allow_html=True)
-        
+
         with col3:
             st.markdown(f'<p class="student-info">Gender: {student.get("gender", "N/A")}</p>', unsafe_allow_html=True)
             st.markdown(f'<p class="student-info">Parent: {student.get("parent_name", "N/A")}</p>', unsafe_allow_html=True)
-        
+
         with col4:
             status = "🟢 Active" if student.get('is_active', True) else "🔴 Inactive"
             st.markdown(f'<p class="student-info">{status}</p>', unsafe_allow_html=True)
-        
+
         with col5:
             if st.button("View", key=f"view_{student['id']}", use_container_width=True):
                 st.session_state['selected_student_id'] = student['id']
                 st.switch_page("pages/3_👤_Student_Profile.py")
-        
+
         st.markdown("<hr style='margin: 0.5rem 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
+
+    # ── Pagination controls ──────────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    p1, p2, p3 = st.columns([1, 2, 1])
+
+    with p1:
+        if st.button("⬅️ Previous", use_container_width=True,
+                     disabled=(page_num <= 1)):
+            st.session_state['page_num'] = page_num - 1
+            st.rerun()
+
+    with p2:
+        st.markdown(
+            f"<p style='text-align:center; font-weight:700; color:#2563eb; "
+            f"margin-top:0.5rem;'>Page {page_num} of {total_pages} "
+            f"&nbsp;|&nbsp; Showing {start_idx+1}–{min(end_idx, total_students)} "
+            f"of {total_students} students</p>",
+            unsafe_allow_html=True
+        )
+
+    with p3:
+        if st.button("Next ➡️", use_container_width=True,
+                     disabled=(page_num >= total_pages)):
+            st.session_state['page_num'] = page_num + 1
+            st.rerun()
+
 else:
     st.info("📭 No students found matching your criteria")
