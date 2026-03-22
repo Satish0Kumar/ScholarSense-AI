@@ -16,6 +16,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 
+from frontend.utils.ui_helpers import show_skeleton_cards, show_skeleton_table
+
+
 # ── Imports (add at top with other imports) ────────────────
 from frontend.utils.page_header import render_page_header
 
@@ -208,11 +211,30 @@ render_page_header(
 )
 
 
-# Fetch data
+# Show skeleton while loading
+skeleton_placeholder = st.empty()
+with skeleton_placeholder.container():
+    show_skeleton_cards(count=4, cols=4)
+
+# Fetch real data safely
+from frontend.utils.ui_helpers import safe_api_call
+
 with st.spinner("Loading dashboard data..."):
-    students = APIClient.get_students()
-    total_students = len(students)
-    high_risk_students = APIClient.get_high_risk_students()
+    students           = safe_api_call(
+                            APIClient.get_students,
+                            fallback=[],
+                            error_msg="Could not load students"
+                         )
+    total_students     = len(students)
+    high_risk_students = safe_api_call(
+                            APIClient.get_high_risk_students,
+                            fallback=[],
+                            error_msg="Could not load risk data"
+                         )
+
+# Clear skeleton once data is ready
+skeleton_placeholder.empty()
+
 
 # Metrics Row
 st.markdown("### 📈 Key Metrics")

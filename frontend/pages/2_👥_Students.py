@@ -13,6 +13,8 @@ import streamlit as st
 from frontend.utils.session_manager import SessionManager
 from frontend.utils.api_client import APIClient
 import pandas as pd
+from frontend.utils.ui_helpers import show_empty_state, safe_api_call
+
 
 # Pagination
 PAGE_SIZE = 10
@@ -118,12 +120,17 @@ with st.spinner("Loading students..."):
     section = None if section_filter == "All" else section_filter
     token   = st.session_state.get('token', '')
 
-    students = fetch_students_cached(
+
+    students = safe_api_call(
+        fetch_students_cached,
+        fallback = [],
+        error_msg = "Could not load students",
         _token  = token,
         grade   = grade,
         section = section,
         search  = search if search else None
     )
+
 
 # Stats
 col1, col2 = st.columns([3, 1])
@@ -254,4 +261,8 @@ if students:
             st.rerun()
 
 else:
-    st.info("📭 No students found matching your criteria")
+    show_empty_state(
+        title    = "No Students Found",
+        subtitle = "Try adjusting the grade/section filters or search term.",
+        icon     = "👥"
+    )
