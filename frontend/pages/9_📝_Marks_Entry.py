@@ -408,7 +408,7 @@ with tab1:
             saved_id = result.get('data', {}).get('id')
             if saved_id:
                 sync_result = PredictionService.sync_marks_to_academic_record(
-                    student_id, saved_id
+                    sel_student_id, saved_id    # ← correct variable name
                 )
                 if sync_result.get('status') == 'success':
                     st.info("🔄 Academic record synced for ML predictions")
@@ -684,11 +684,17 @@ with tab2:
             st.markdown('<p class="section-header">📋 Full Class Marks</p>',
                         unsafe_allow_html=True)
 
+            # ✅ REPLACE WITH:
             with st.spinner("Loading class marks..."):
-                class_result = api_get(
-                    f"/marks/{an_grade}/{an_section}"
-                )
-
+                if an_section == 'All':
+                    class_result = api_get(
+                        f"/marks/{an_grade}/All",
+                        params={"section": None}
+                    )
+                else:
+                    class_result = api_get(
+                        f"/marks/{an_grade}/{an_section}"
+                    )
             if class_result.get('status') == 'success':
                 class_marks = class_result['data'].get('marks', [])
 

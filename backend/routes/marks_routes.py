@@ -32,9 +32,10 @@ def get_class_marks(grade, section):
     try:
         subject  = request.args.get('subject')
         semester = request.args.get('semester')
+        # Treat 'All' as no section filter
         result   = MarksService.get_class_marks(
             grade    = grade,
-            section  = section,
+            section  = None if section == 'All' else section,
             subject  = subject,
             semester = semester
         )
@@ -66,8 +67,12 @@ def update_marks(record_id):
 @jwt_required()
 def get_grade_marks_stats(grade):
     try:
+        # ✅ REPLACE WITH:
         section = request.args.get('section')
-        result  = MarksService.get_marks_stats(grade=grade, section=section)
+        result  = MarksService.get_marks_stats(
+            grade   = grade,
+            section = None if section == 'All' else section
+        )
         return jsonify(result), 200
     except Exception as e:
         print(f"❌ Get grade stats error: {e}")

@@ -18,12 +18,26 @@ import streamlit as st
 from frontend.utils.session_manager import SessionManager
 from frontend.utils.api_client import APIClient
 
+
+# ── Top of app.py (replace existing top block) ──
+from frontend.utils.session_manager import SessionManager
+
+# Initialize + restore session from cookie
+SessionManager.initialize_session()
+
+# Already logged in → go to dashboard
+if SessionManager.is_authenticated():
+    st.switch_page("pages/1_📊_Dashboard.py")
+
 st.set_page_config(
-    page_title = "ScholarSense - Login",
-    page_icon  = "🎓",
-    layout     = "centered",
+    page_title          = "ScholarSense - Login",
+    page_icon           = "🎓",
+    layout              = "centered",
     initial_sidebar_state = "collapsed"
 )
+
+
+
 
 # ── Hide Streamlit's default auto-generated nav ────────────────────────────────
 st.markdown("""
