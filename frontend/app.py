@@ -1,16 +1,5 @@
-"""
-ScholarSense - Main Application (Login + OTP)
-AI-Powered Academic Intelligence System
-
-2FA Login Flow:
-  Step 1 → Enter email + password → API sends OTP
-  Step 2 → Enter OTP → API returns JWT token
-  Step 3 → Redirect to Dashboard
-"""
 import sys
 from pathlib import Path
-
-# Add project root to Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -18,52 +7,31 @@ import streamlit as st
 from frontend.utils.session_manager import SessionManager
 from frontend.utils.api_client import APIClient
 
-
-# ── Top of app.py (replace existing top block) ──
-from frontend.utils.session_manager import SessionManager
-
-# Initialize + restore session from cookie
-SessionManager.initialize_session()
-
-# Already logged in → go to dashboard
-if SessionManager.is_authenticated():
-    st.switch_page("pages/1_📊_Dashboard.py")
-
+# ── ALWAYS FIRST ──────────────────────────────────────────────
 st.set_page_config(
-    page_title          = "ScholarSense - Login",
-    page_icon           = "🎓",
-    layout              = "centered",
+    page_title            = "ScholarSense - Login",
+    page_icon             = "🎓",
+    layout                = "centered",
     initial_sidebar_state = "collapsed"
 )
 
-
-
-
-# ── Hide Streamlit's default auto-generated nav ────────────────────────────────
-st.markdown("""
-<style>
-    [data-testid="stSidebarNav"] {
-        display: none !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# ── Constants ─────────────────────────────────────────────────────────────────
-MAX_ATTEMPTS = 3
-
-# ── Initialize session ─────────────────────────────────────────────────────────
+# ── Restore + check session ────────────────────────────────────
 SessionManager.initialize_session()
 
+if SessionManager.is_authenticated():
+    st.switch_page("pages/1_📊_Dashboard.py")
 
-# ── Initialize OTP session state ───────────────────────────────────────────────
-if 'login_step'    not in st.session_state:
-    st.session_state.login_step    = 'credentials'  # 'credentials' | 'otp'
-if 'otp_user_id'   not in st.session_state:
-    st.session_state.otp_user_id   = None
-if 'otp_email'     not in st.session_state:
-    st.session_state.otp_email     = None
-if 'otp_attempts'  not in st.session_state:
-    st.session_state.otp_attempts  = 0
+# ── OTP state (only once) ──────────────────────────────────────
+MAX_ATTEMPTS = 3
+if 'login_step'   not in st.session_state:
+    st.session_state.login_step   = 'credentials'
+if 'otp_user_id'  not in st.session_state:
+    st.session_state.otp_user_id  = None
+if 'otp_email'    not in st.session_state:
+    st.session_state.otp_email    = None
+if 'otp_attempts' not in st.session_state:
+    st.session_state.otp_attempts = 0
+
 
 # ── CSS ────────────────────────────────────────────────────────────────────────
 st.markdown("""

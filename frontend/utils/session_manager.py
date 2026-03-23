@@ -1,55 +1,52 @@
 """
-Session Management for Streamlit
-ScholarSense - AI-Powered Academic Intelligence System
-Persists login across page refreshes using encrypted browser cookies
+Session Management for Streamlit - ScholarSense
+Uses streamlit-local-storage for reliable session persistence
 """
 import streamlit as st
 import json
 from datetime import datetime, timedelta
 from frontend.utils.api_client import APIClient
 
-# ── Cookie manager (singleton via session_state) ──────────────
-def _get_cookie_manager():
-    """Get or create cookie manager instance"""
-    if '_cookie_manager' not in st.session_state:
-        from streamlit_cookies_manager import EncryptedCookieManager
-        cm = EncryptedCookieManager(
-            prefix   = "scholarsense_",
-            password = "ss_secret_key_2026_scholarsense"   # change to any strong string
-        )
-        st.session_state._cookie_manager = cm
-    return st.session_state._cookie_manager
+
+def get_local_storage():
+    """Get LocalStorage instance (cached in session)"""
+    if '_ls' not in st.session_state:
+        from streamlit_local_storage import LocalStorage
+        st.session_state._ls = LocalStorage()
+    return st.session_state._ls
 
 
 class SessionManager:
-    """Manage user authentication state in Streamlit"""
 
     @staticmethod
     def initialize_session():
-        """Initialize session — restore from cookies if available"""
-        # Set defaults
+        """Set defaults + restore from localStorage if not already in session"""
         for key, val in [
             ('authenticated', False),
             ('user',          None),
             ('token',         None),
-            ('token_expiry',  None)
+            ('token_expiry',  None),
+            ('_session_restored', False)
         ]:
             if key not in st.session_state:
                 st.session_state[key] = val
 
-        # Already authenticated in this session — skip cookie check
+        # Already authenticated this run — skip restore
         if st.session_state.get('authenticated'):
             return
 
-        # ── Try restoring from cookie ──────────────────────────
-        try:
-            cm = _get_cookie_manager()
-            if not cm.ready():
-                st.stop()   # Wait for cookies to load
+        # Already tried restore this run — skip to avoid loops
+        if st.session_state.get('_session_restored'):
+            return
 
-            token  = cm.get("token")
-            expiry = cm.get("expiry")
-            user   = cm.get("user")
+        st.session_state['_session_restored'] = True
+
+        # ── Try restoring from localStorage ───────────────────
+        try:
+            ls    = get_local_storage()
+            token  = ls.getItem("ss_token")
+            expiry = ls.getItem("ss_expiry")
+            user   = ls.getItem("ss_user")
 
             if token and expiry:
                 expiry_dt = datetime.fromisoformat(expiry)
@@ -61,76 +58,61 @@ class SessionManager:
                         json.loads(user) if user else {}
                     )
         except Exception:
-            pass   # If cookies fail, just show login
+            pass
 
     @staticmethod
-    def _save_cookie(token: str, user: dict, expiry_dt: datetime):
-        """Save auth data to encrypted cookie"""
+    def _save(token: str, user: dict, expiry_dt: datetime):
+        """Persist to localStorage"""
         try:
-            cm = _get_cookie_manager()
-            if cm.ready():
-                cm["token"]  = token
-                cm["expiry"] = expiry_dt.isoformat()
-                cm["user"]   = json.dumps(user)
-                cm.save()
+            ls = get_local_storage()
+            ls.setItem("ss_token",  token)
+            ls.setItem("ss_expiry", expiry_dt.isoformat())
+            ls.setItem("ss_user",   json.dumps(user))
         except Exception:
             pass
 
     @staticmethod
-    def _clear_cookie():
-        """Clear auth cookie"""
+    def _clear():
+        """Clear localStorage"""
         try:
-            cm = _get_cookie_manager()
-            if cm.ready():
-                cm["token"]  = ""
-                cm["expiry"] = ""
-                cm["user"]   = ""
-                cm.save()
+            ls = get_local_storage()
+            ls.deleteItem("ss_token")
+            ls.deleteItem("ss_expiry")
+            ls.deleteItem("ss_user")
         except Exception:
             pass
-
-    @staticmethod
-    def login(email: str, password: str):
-        """Login user → store in session + cookie"""
-        result = APIClient.login(email, password)
-        if 'error' not in result:
-            token     = result['access_token']
-            user      = result['user']
-            expiry_dt = datetime.now() + timedelta(hours=8)
-
-            st.session_state.authenticated = True
-            st.session_state.user          = user
-            st.session_state.token         = token
-            st.session_state.token_expiry  = expiry_dt
-
-            SessionManager._save_cookie(token, user, expiry_dt)
-            return True
-        return result['error']
 
     @staticmethod
     def set_session(token: str, user: dict):
-        """Called after OTP verify — store token in session + cookie"""
+        """Called after OTP verify — save to session + localStorage"""
         expiry_dt = datetime.now() + timedelta(hours=8)
-
         st.session_state.authenticated = True
         st.session_state.token         = token
         st.session_state.user          = user
         st.session_state.token_expiry  = expiry_dt
+        SessionManager._save(token, user, expiry_dt)
 
-        SessionManager._save_cookie(token, user, expiry_dt)
+    @staticmethod
+    def login(email: str, password: str):
+        """Direct login (non-OTP flow)"""
+        result = APIClient.login(email, password)
+        if 'error' not in result:
+            SessionManager.set_session(result['access_token'], result['user'])
+            return True
+        return result['error']
 
     @staticmethod
     def logout():
-        """Logout → clear session + cookie"""
-        st.session_state.authenticated = False
-        st.session_state.user          = None
-        st.session_state.token         = None
-        st.session_state.token_expiry  = None
-        SessionManager._clear_cookie()
+        """Clear session + localStorage"""
+        st.session_state.authenticated    = False
+        st.session_state.user             = None
+        st.session_state.token            = None
+        st.session_state.token_expiry     = None
+        st.session_state._session_restored = False
+        SessionManager._clear()
 
     @staticmethod
     def is_authenticated() -> bool:
-        """Check if authenticated and token not expired"""
         if not st.session_state.get('authenticated'):
             return False
         expiry = st.session_state.get('token_expiry')
@@ -141,7 +123,7 @@ class SessionManager:
 
     @staticmethod
     def require_auth():
-        """Redirect to login if not authenticated"""
+        """Call at top of every page — restores session or redirects"""
         SessionManager.initialize_session()
         if not SessionManager.is_authenticated():
             st.warning("⚠️ Please login to access this page")
