@@ -727,10 +727,9 @@ with tab3:
                 )])
                 fig_donut.update_layout(
                     **get_plotly_layout("🎯 School-wide Risk Distribution", height=350),
-                    margin=dict(t=50, b=20, l=10, r=10),
-                    showlegend=True,
-                    legend=dict(orientation='v', x=1.02, y=0.5)
+                    margin=dict(t=50, b=20, l=10, r=10)
                 )
+                fig_donut.update_layout(legend=dict(orientation='v', x=1.02, y=0.5))
                 st.plotly_chart(fig_donut, use_container_width=True)
             else:
                 st.info("ℹ️ No prediction data yet.")
@@ -752,17 +751,12 @@ with tab3:
                     textposition='outside',
                     hovertemplate='<b>%{y}</b><br>Students: %{x}<extra></extra>'
                 )])
-                fig_bar.update_layout(**get_plotly_layout(), 
-                    title="📊 Students per Risk Level",
-                    height=350,
-                    xaxis=dict(
-                        title='Number of Students',
-                        showgrid=True,
-                        gridcolor='#f0f0f0'
-                    ),
-                    yaxis=dict(title='Risk Level', showgrid=False),
+                fig_bar.update_layout(
+                    **get_plotly_layout("📊 Students per Risk Level", height=350),
                     margin=dict(t=50, b=40, l=80, r=40)
                 )
+                fig_bar.update_xaxes(title='Number of Students', showgrid=True)
+                fig_bar.update_yaxes(showgrid=False)
                 st.plotly_chart(fig_bar, use_container_width=True)
 
         st.markdown("---")

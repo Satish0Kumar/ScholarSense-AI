@@ -769,28 +769,24 @@ def responsive_columns(desktop_spec, mobile_cols=1):
 
 
 
-def get_plotly_layout(title="", height=340, extra=None):
-    import streamlit as st
-    dark = st.session_state.get('dark_mode', True)
+def get_plotly_layout(title="", height=400, **kwargs):
+    is_dark = st.session_state.get("dark_mode", False)
 
-    bg   = "#1e293b" if dark else "white"
-    text = "#e2e8f0" if dark else "#1a202c"
-    grid = "#334155" if dark else "#f0f0f0"
+    bg_color   = "#1e2130" if is_dark else "white"
+    paper_bg   = "#1e2130" if is_dark else "white"
+    font_color = "#e2e8f0" if is_dark else "#1a202c"
+    grid_color = "#2d3748" if is_dark else "#f0f0f0"
 
-    layout = dict(
-        title         = dict(text=title, font=dict(size=14, color=text)),
-        height        = height,
-        plot_bgcolor  = bg,
-        paper_bgcolor = bg,
-        font          = dict(color=text, size=12),
-        xaxis         = dict(gridcolor=grid, color=text,
-                             linecolor=grid, tickfont=dict(color=text)),
-        yaxis         = dict(gridcolor=grid, color=text,
-                             linecolor=grid, tickfont=dict(color=text)),
-        legend        = dict(font=dict(color=text), bgcolor=bg,
-                             bordercolor=grid),
-        # ← NO margin here, so pages can pass their own freely
-    )
-    if extra:
-        layout.update(extra)
+    layout = {
+        "title":        dict(text=title, font=dict(size=15, color=font_color)),
+        "height":       height,
+        "plot_bgcolor": bg_color,
+        "paper_bgcolor":paper_bg,
+        "font":         dict(color=font_color, size=12),
+        "xaxis":        dict(gridcolor=grid_color, zerolinecolor=grid_color),
+        "yaxis":        dict(gridcolor=grid_color, zerolinecolor=grid_color),
+        "legend":       dict(font=dict(color=font_color)),
+        "margin":       dict(t=50, b=40, l=50, r=20),
+    }
+    layout.update(kwargs)
     return layout
