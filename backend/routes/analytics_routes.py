@@ -28,8 +28,8 @@ def _db():
 @analytics_bp.route('/api/analytics/school-overview', methods=['GET'])
 @jwt_required()
 def get_school_overview():
+    db = _db()
     try:
-        db = _db()
 
         # ── 1. Total active students ──────────────────────────────
         total_active = db.query(func.count(Student.id)).filter(
@@ -53,7 +53,7 @@ def get_school_overview():
             Student, Student.id == Attendance.student_id
         ).filter(
             Student.is_active == True,
-            Attendance.status == 'Present'
+            Attendance.status == 'present'
         ).scalar() or 0
 
         avg_attendance = round(
@@ -176,8 +176,6 @@ def get_school_overview():
             func.count(Communication.id)
         ).scalar() or 0
 
-        db.close()
-
         return jsonify({
             'status': 'success',
             'data': {
@@ -198,6 +196,8 @@ def get_school_overview():
     except Exception as e:
         print(f"❌ School overview error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+    finally:
+        db.close()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -206,9 +206,9 @@ def get_school_overview():
 @analytics_bp.route('/api/analytics/trends', methods=['GET'])
 @jwt_required()
 def get_analytics_trends():
+    months = request.args.get('months', 6, type=int)
+    db     = _db()
     try:
-        months = request.args.get('months', 6, type=int)
-        db     = _db()
         cutoff = datetime.utcnow() - timedelta(days=months * 30)
 
         # Incident trend per month
@@ -239,8 +239,6 @@ def get_analytics_trends():
 
         comm_trends = [{'month': r.month, 'count': r.count} for r in comm_rows]
 
-        db.close()
-
         return jsonify({
             'status': 'success',
             'data': {
@@ -253,3 +251,5 @@ def get_analytics_trends():
     except Exception as e:
         print(f"❌ Analytics trends error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+    finally:
+        db.close()

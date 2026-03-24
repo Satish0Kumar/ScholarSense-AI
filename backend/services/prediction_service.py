@@ -1,10 +1,6 @@
 
 
 
-"""
-Risk Prediction Service - ML Model Integration
-ScholarSense - AI-Powered Academic Intelligence System
-"""
 # Fix numpy random state issue for model loading
 import sys
 import os
@@ -12,14 +8,6 @@ import os
 # Suppress warnings
 import warnings
 warnings.filterwarnings('ignore')
-
-# Fix numpy compatibility
-try:
-    import numpy as np
-    # Workaround for numpy random state loading issue
-    import numpy.random._pickle
-except:
-    pass
 
 import pickle
 from datetime import datetime

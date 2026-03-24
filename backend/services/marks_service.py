@@ -6,7 +6,7 @@ Handles marks entry, GPA calculation, and analytics
 """
 
 from datetime import datetime
-from sqlalchemy import and_, func, desc
+from sqlalchemy import and_, func, desc, text
 from backend.database.models import MarksEntry, Student, AcademicRecord
 from backend.database.db_config import SessionLocal
 
@@ -548,10 +548,8 @@ class MarksService:
     @classmethod
     def get_grade_stats(cls, grade, section=None):
         """Returns avg scores per subject for a grade/section"""
-        from backend.database import get_db_connection
-        conn = get_db_connection()
+        db = SessionLocal()
         try:
-            cur = conn.cursor()
             query = """
                 SELECT
                     AVG(math_score) as math, AVG(science_score) as science,
@@ -565,19 +563,17 @@ class MarksService:
             if section:
                 query += " AND s.section = %s"
                 params.append(section)
-            cur.execute(query, params)
-            row = cur.fetchone()
+            result = db.execute(text(query), params)
+            row = result.fetchone()
             return dict(row) if row else {}
         finally:
-            conn.close()
+            db.close()
 
     @classmethod
     def get_failed_students(cls, grade=None, semester=None):
         """Returns students with failed_subjects > 0"""
-        from backend.database import get_db_connection
-        conn = get_db_connection()
+        db = SessionLocal()
         try:
-            cur = conn.cursor()
             query = """
                 SELECT s.student_id, s.first_name, s.last_name, s.grade, s.section,
                     ar.failed_subjects, ar.current_gpa, ar.semester
@@ -593,7 +589,7 @@ class MarksService:
                 query += " AND ar.semester = %s"
                 params.append(semester)
             query += " ORDER BY ar.failed_subjects DESC"
-            cur.execute(query, params)
-            return [dict(r) for r in cur.fetchall()]
+            result = db.execute(text(query), params)
+            return [dict(r) for r in result.fetchall()]
         finally:
-            conn.close()
+            db.close()

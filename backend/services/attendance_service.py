@@ -255,52 +255,24 @@ class AttendanceService:
             grade: Optional grade filter
             section: Optional section filter
         """
-        print(f"\n{'='*60}")
-        print(f"🔍 ATTENDANCE SERVICE - get_daily_attendance() called")
-        print(f"   Date: {attendance_date}")
-        print(f"   Grade filter: {grade} (type: {type(grade)})")
-        print(f"   Section filter: {section} (type: {type(section)})")
-        print(f"{'='*60}\n")
-        
         db = next(get_db())
         try:
             # Get all students with filters
-            print("📝 Step 1: Building student query...")
             student_query = db.query(Student).filter(Student.is_active == True)
             
             # Apply filters only if provided
             if grade is not None:
-                print(f"   ➡️ Applying grade filter: {grade}")
                 student_query = student_query.filter(Student.grade == grade)
-            else:
-                print(f"   ➡️ No grade filter (showing all grades)")
                 
             if section is not None:
-                print(f"   ➡️ Applying section filter: {section}")
                 student_query = student_query.filter(Student.section == section)
-            else:
-                print(f"   ➡️ No section filter (showing all sections)")
             
             students = student_query.order_by(Student.grade, Student.section, Student.first_name).all()
             
-            print(f"\n✅ Step 1 Complete: Found {len(students)} students")
-            
-            if len(students) > 0:
-                print(f"   Sample student: {students[0].first_name} {students[0].last_name} (Grade {students[0].grade}-{students[0].section})")
-            else:
-                print(f"   ⚠️ NO STUDENTS FOUND IN DATABASE!")
-                print(f"   Check if:")
-                print(f"      1. Students exist in database")
-                print(f"      2. Students have is_active=True")
-                print(f"      3. Grade/Section values match")
-            
             # Get attendance for this date
-            print(f"\n📝 Step 2: Getting attendance records for {attendance_date}...")
             attendance_records = db.query(Attendance).filter(
                 Attendance.attendance_date == attendance_date
             ).all()
-            
-            print(f"✅ Step 2 Complete: Found {len(attendance_records)} attendance records for this date")
             
             # Create lookup dict
             attendance_dict = {
@@ -309,7 +281,6 @@ class AttendanceService:
             }
             
             # Combine results
-            print(f"\n📝 Step 3: Combining student data with attendance...")
             result = []
             for student in students:
                 student_dict = student.to_dict()
@@ -319,18 +290,9 @@ class AttendanceService:
                 )
                 result.append(student_dict)
             
-            print(f"✅ Step 3 Complete: Prepared {len(result)} student records with attendance data")
-            print(f"\n{'='*60}")
-            print(f"🎯 FINAL RESULT: Returning {len(result)} students")
-            print(f"{'='*60}\n")
-            
             return result
             
         except Exception as e:
-            print(f"\n❌ ERROR in get_daily_attendance:")
-            print(f"   {e}")
-            import traceback
-            traceback.print_exc()
             return []
         finally:
             db.close()
