@@ -62,7 +62,7 @@ def download_atrisk_report():
         pdf_bytes = PDFService.generate_atrisk_report()
         buffer    = io.BytesIO(pdf_bytes)
         buffer.seek(0)
-        filename  = f"atrisk_report_{datetime.now().strftime('%Y%m%d')}.pdf"
+        filename  = f"atrisk_report_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
         return send_file(
             buffer,
             mimetype      = 'application/pdf',

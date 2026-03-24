@@ -49,7 +49,7 @@ FEATURE_NAMES = [
 VALID_GENDERS = ['Male', 'Female']
 VALID_SES = ['Low', 'Medium', 'High']
 VALID_PARENT_EDU = ['None', 'High School', 'Graduate', 'Post-Graduate']
-VALID_GRADES = [9, 10, 11, 12]
+VALID_GRADES = [6, 7, 8, 9, 10]  # Grades 6-10 only (per schema and training data)
 
 print(f"✓ Configuration loaded")
 print(f"  Model directory: {MODEL_DIR}")

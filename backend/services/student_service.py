@@ -19,6 +19,11 @@ class StudentService:
         """
         db = next(get_db())
         try:
+            # Validate grade is in valid range
+            grade = data.get('grade')
+            if grade not in [6, 7, 8, 9, 10]:
+                return {'error': f"Grade must be between 6 and 10, got {grade}"}
+            
             # Check if student ID already exists
             existing = db.query(Student).filter(Student.student_id == data.get('student_id')).first()
             if existing:
@@ -140,6 +145,10 @@ class StudentService:
         """
         db = next(get_db())
         try:
+            # Validate grade if provided
+            if 'grade' in data and data['grade'] not in [6, 7, 8, 9, 10]:
+                return {'error': 'Invalid grade. Grades must be between 6 and 10.'}
+            
             student = db.query(Student).filter(Student.id == student_id).first()
             
             if not student:

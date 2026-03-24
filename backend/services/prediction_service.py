@@ -229,22 +229,63 @@ class PredictionService:
                 print(f"🤖 ML Model Prediction: Risk Level {risk_level}")
                 
             else:
-                # Fallback to dummy prediction
-                gpa = features['current_gpa']
-                if gpa >= 80:
-                    risk_level = 0  # Low
-                    probabilities = [0.70, 0.20, 0.08, 0.02]
-                elif gpa >= 60:
-                    risk_level = 1  # Medium
-                    probabilities = [0.20, 0.60, 0.15, 0.05]
-                elif gpa >= 40:
-                    risk_level = 2  # High
-                    probabilities = [0.05, 0.20, 0.60, 0.15]
-                else:
-                    risk_level = 3  # Critical
-                    probabilities = [0.02, 0.08, 0.20, 0.70]
+                # Fallback to improved dummy prediction using multiple features
+                risk_level = 0  # Start with Low
                 
-                print(f"⚠️  Dummy Prediction: Risk Level {risk_level}")
+                # GPA factor (most important)
+                gpa = features.get('current_gpa', 0)
+                if gpa < 40:
+                    risk_level = 3  # Critical
+                elif gpa < 50:
+                    risk_level = 2  # High
+                elif gpa < 65:
+                    risk_level = 1  # Medium
+                
+                # Grade trend factor (declining trend increases risk)
+                grade_trend = features.get('grade_trend', 0)
+                if grade_trend < -5:
+                    risk_level = min(3, risk_level + 2)  # Significant decline
+                elif grade_trend < 0:
+                    risk_level = min(3, risk_level + 1)  # Slight decline
+                
+                # Attendance factor (poor attendance increases risk)
+                attendance_rate = features.get('attendance_percentage', 100)
+                if attendance_rate < 60:
+                    risk_level = min(3, risk_level + 2)  # Very low attendance
+                elif attendance_rate < 75:
+                    risk_level = min(3, risk_level + 1)  # Low attendance
+                
+                # Failed subjects factor
+                failed_subjects = features.get('failed_subjects', 0)
+                if failed_subjects >= 3:
+                    risk_level = min(3, risk_level + 2)  # Multiple failures
+                elif failed_subjects >= 1:
+                    risk_level = min(3, risk_level + 1)  # Some failures
+                
+                # Behavioral incidents
+                disciplinary_incidents = features.get('disciplinary_incidents', 0)
+                if disciplinary_incidents >= 3:
+                    risk_level = min(3, risk_level + 1)  # Behavioral issues
+                
+                # Assignment submission rate (engagement indicator)
+                assignment_rate = features.get('assignment_submission_rate', 100)
+                if assignment_rate < 60:
+                    risk_level = min(3, risk_level + 1)  # Poor engagement
+                
+                # Cap risk level at 3 (Critical)
+                risk_level = min(3, max(0, risk_level))
+                
+                # Assign probabilities based on risk level
+                if risk_level == 0:
+                    probabilities = [0.75, 0.18, 0.05, 0.02]
+                elif risk_level == 1:
+                    probabilities = [0.15, 0.70, 0.12, 0.03]
+                elif risk_level == 2:
+                    probabilities = [0.05, 0.15, 0.70, 0.10]
+                else:  # risk_level == 3
+                    probabilities = [0.02, 0.05, 0.15, 0.78]
+                
+                print(f"⚠️  Dummy Prediction: Risk Level {risk_level} (GPA:{gpa:.1f}, Att:{attendance_rate:.0f}%, Fail:{failed_subjects})")
             
             # Map risk level to label
             risk_labels = {0: 'Low', 1: 'Medium', 2: 'High', 3: 'Critical'}
@@ -327,10 +368,10 @@ class PredictionService:
         """Get list of high-risk students"""
         db = next(get_db())
         try:
-            # Subquery to get latest prediction for each student
+            # Subquery to get latest prediction for each student (by ID for determinism)
             subquery = db.query(
                 RiskPrediction.student_id,
-                func.max(RiskPrediction.prediction_date).label('max_date')
+                func.max(RiskPrediction.id).label('max_id')
             ).group_by(RiskPrediction.student_id).subquery()
             
             query = db.query(Student, RiskPrediction).join(
@@ -338,7 +379,7 @@ class PredictionService:
             ).join(
                 subquery,
                 (RiskPrediction.student_id == subquery.c.student_id) &
-                (RiskPrediction.prediction_date == subquery.c.max_date)
+                (RiskPrediction.id == subquery.c.max_id)
             ).filter(
                 Student.is_active == True,
                 RiskPrediction.risk_level >= 2  # High or Critical

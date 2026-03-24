@@ -5,7 +5,7 @@ ScholarSense - AI-Powered Academic Intelligence System
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Time, Text, DECIMAL, ForeignKey, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, date
 from backend.database.db_config import Base
 
 # ============================================
@@ -52,6 +52,10 @@ class User(Base):
 class Student(Base):
     """Student records for grades 6-10"""
     __tablename__ = 'students'
+    __table_args__ = (
+        CheckConstraint('grade BETWEEN 6 AND 10', name='valid_grade'),
+        CheckConstraint('age IS NULL OR (age BETWEEN 10 AND 20)', name='valid_age'),
+    )
     
     id = Column(Integer, primary_key=True, index=True)
     student_id = Column(String(50), unique=True, nullable=False, index=True)
@@ -59,7 +63,7 @@ class Student(Base):
     last_name = Column(String(100), nullable=False)
     grade = Column(Integer, nullable=False, index=True)
     section = Column(String(10))
-    age = Column(Integer)
+    age = Column(Integer)  # Deprecated: compute from date_of_birth instead
     gender = Column(String(10))
     date_of_birth = Column(Date)
     parent_name = Column(String(255))
@@ -84,6 +88,16 @@ class Student(Base):
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
     
+    @property
+    def computed_age(self) -> int:
+        """Compute age from date_of_birth"""
+        if self.date_of_birth:
+            today = date.today()
+            return today.year - self.date_of_birth.year - (
+                (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
+            )
+        return self.age  # Fall back to stored age if DOB not available
+    
     def __repr__(self):
         return f"<Student(id={self.id}, student_id='{self.student_id}', name='{self.full_name}')>"
     
@@ -97,7 +111,7 @@ class Student(Base):
             'full_name': self.full_name,
             'grade': self.grade,
             'section': self.section,
-            'age': self.age,
+            'age': self.computed_age,  # Use computed age from date_of_birth
             'gender': self.gender,
             'date_of_birth': self.date_of_birth.isoformat() if self.date_of_birth else None,
             'parent_name': self.parent_name,

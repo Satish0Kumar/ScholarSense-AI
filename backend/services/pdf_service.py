@@ -175,7 +175,7 @@ class PDFService:
         ])
         header_data.append([
             Paragraph(
-                f"Generated on: {datetime.now().strftime('%d %B %Y, %I:%M %p')}",
+                f"Generated on: {datetime.utcnow().strftime('%d %B %Y, %I:%M %p')} UTC",
                 ParagraphStyle(
                     'GenDate',
                     fontSize  = 9,

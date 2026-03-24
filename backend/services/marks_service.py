@@ -55,17 +55,19 @@ class MarksService:
         """
         GPA = average of all 5 subjects
         Formula: (math + science + english + social + language) / 5
+        Requires all 5 scores; if any is None, returns 0.0
         """
-        scores = [s for s in [math, science, english, social, language]
-                  if s is not None]
-        if not scores:
+        scores = [math, science, english, social, language]
+        # All scores must be present for valid GPA calculation
+        if any(s is None for s in scores):
             return 0.0
-        return round(sum(scores) / len(scores), 2)
+        return round(sum(scores) / 5, 2)
 
     @staticmethod
     def calculate_failed_subjects(math, science, english, social, language):
-        """Count subjects below PASS_MARK (35)"""
+        """Count subjects below PASS_MARK (35). Only counts non-None scores."""
         scores = [math, science, english, social, language]
+        # Count failures only from non-None scores (consistent with GPA)
         return sum(1 for s in scores if s is not None and s < PASS_MARK)
 
     @staticmethod
@@ -123,6 +125,21 @@ class MarksService:
             english  = data.get('english_score')
             social   = data.get('social_score')
             language = data.get('language_score')
+            
+            # ── Validate all 5 scores are provided ────────────
+            scores = [math, science, english, social, language]
+            if None in scores:
+                missing_subjects = []
+                subject_map = {'math_score': math, 'science_score': science, 
+                              'english_score': english, 'social_score': social,
+                              'language_score': language}
+                for key, val in subject_map.items():
+                    if val is None:
+                        missing_subjects.append(key.replace('_score', ''))
+                return {
+                    "status": "error",
+                    "message": f"All 5 subject scores are required. Missing: {', '.join(missing_subjects)}"
+                }
 
             # ── Auto-calculate ─────────────────────────────────
             gpa             = MarksService.calculate_gpa(
@@ -233,8 +250,15 @@ class MarksService:
             ).first()
 
             if existing:
-                # Fetch previous GPA for trend calculation
-                prev_gpa    = float(existing.current_gpa) if existing.current_gpa else gpa
+                # Fetch previous semester's GPA for trend calculation
+                prev_semester = semester - 1 if semester > 1 else 1
+                prev_record = db.query(AcademicRecord).filter(
+                    and_(
+                        AcademicRecord.student_id == student_id,
+                        AcademicRecord.semester   == prev_semester
+                    )
+                ).first()
+                prev_gpa = float(prev_record.current_gpa) if (prev_record and prev_record.current_gpa) else gpa
                 grade_trend = round(gpa - prev_gpa, 2)
 
                 existing.current_gpa               = gpa
@@ -254,7 +278,7 @@ class MarksService:
                     semester                   = semester,
                     current_gpa                = gpa,
                     previous_gpa               = gpa,
-                    grade_trend                = 0.0,
+                    grade_trend                = 0.0,  # No trend for first semester
                     failed_subjects            = failed_subjects,
                     total_subjects             = 5,
                     math_score                 = math,
