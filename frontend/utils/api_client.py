@@ -100,9 +100,15 @@ class APIClient:
                 timeout=5
             )
             
+            # AFTER ✅ (extract students list from paginated response)
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                # Handle both paginated and direct list responses
+                if isinstance(data, dict) and 'students' in data:
+                    return data['students']
+                return data if isinstance(data, list) else []
             return []
+
         except Exception as e:
             st.error(f"Error fetching students: {e}")
             return []

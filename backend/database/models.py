@@ -441,7 +441,7 @@ class OtpToken(Base):
     id         = Column(Integer, primary_key=True, index=True)
     user_id    = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'),
                         nullable=False, index=True)
-    otp_code   = Column(String(6), nullable=False)
+    otp_code = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False)
     is_used    = Column(Boolean, default=False)

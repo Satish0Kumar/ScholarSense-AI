@@ -226,6 +226,8 @@ st.markdown(f"""
 # FETCH ALL DATA UPFRONT
 # ============================================
 _token = st.session_state.get('token', '')
+st.code(_token)   # ← shows your token on screen
+
 
 with st.spinner("📊 Loading school analytics..."):
     overview_res = cached_overview(_token)
