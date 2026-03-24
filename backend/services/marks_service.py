@@ -557,12 +557,12 @@ class MarksService:
                     AVG(current_gpa) as gpa, COUNT(*) as total
                 FROM academic_records ar
                 JOIN students s ON ar.student_id = s.id
-                WHERE s.grade = %s AND s.is_active = true
+                WHERE s.grade = :grade AND s.is_active = true
             """
-            params = [grade]
+            params = {'grade': grade}
             if section:
-                query += " AND s.section = %s"
-                params.append(section)
+                query += " AND s.section = :section"
+                params['section'] = section
             result = db.execute(text(query), params)
             row = result.fetchone()
             return dict(row) if row else {}
@@ -581,13 +581,13 @@ class MarksService:
                 JOIN students s ON ar.student_id = s.id
                 WHERE ar.failed_subjects > 0 AND s.is_active = true
             """
-            params = []
+            params = {}
             if grade:
-                query += " AND s.grade = %s"
-                params.append(grade)
+                query += " AND s.grade = :grade"
+                params['grade'] = grade
             if semester:
-                query += " AND ar.semester = %s"
-                params.append(semester)
+                query += " AND ar.semester = :semester"
+                params['semester'] = semester
             query += " ORDER BY ar.failed_subjects DESC"
             result = db.execute(text(query), params)
             return [dict(r) for r in result.fetchall()]
