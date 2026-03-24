@@ -154,17 +154,24 @@ with col2:
     if st.button("← Back to Students", width='stretch'):
         st.switch_page("pages/2_👥_Students.py")
 with col3:
-    from frontend.utils.report_generator import generate_student_report
-    from frontend.utils.activity_log import log_activity
-    report_html = generate_student_report(details)
-    st.download_button(
-        label="📄 Export Report",
-        data=report_html,
-        file_name=f"report_{details['student_id']}.html",
-        mime="text/html",
-        width='stretch'
-    )
-    # log only when button clicked — Streamlit handles this automatically
+    if st.button("📄 Download PDF Report", width='stretch', type="primary"):
+        with st.spinner("⏳ Generating PDF..."):
+            token = st.session_state.get('token', '')
+            r = requests.get(
+                f"http://localhost:5000/api/reports/student/{student_id}",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=30
+            )
+        if r.status_code == 200:
+            st.download_button(
+                label="⬇️ Save PDF Now",
+                data=r.content,
+                file_name=f"report_{details['student_id']}.pdf",
+                mime="application/pdf",
+                width='stretch'
+            )
+        else:
+            st.error("❌ PDF generation failed. Run `pip install reportlab` first.")
 
 # ============================================
 # TABS  ← Enhancement 4 adds "📝 Incidents"

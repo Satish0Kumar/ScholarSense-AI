@@ -753,7 +753,7 @@ class PDFService:
         try:
             # 2=High, 3=Critical
             query = db.query(RiskPrediction).filter(
-                RiskPrediction.risk_level.in_([2, 3])
+                RiskPrediction.risk_level.in_(['High', 'Critical'])
             ).order_by(RiskPrediction.created_at.desc())
 
             predictions = query.all()
@@ -800,8 +800,14 @@ class PDFService:
                     styles['body']
                 ))
             else:
-                critical_count = sum(1 for _, p in filtered if p.risk_level == 3)
-                high_count     = sum(1 for _, p in filtered if p.risk_level == 2)
+                critical_count = sum(
+                    1 for _, p in filtered
+                    if str(p.risk_level).lower() in ['3', 'critical']
+                )
+                high_count = sum(
+                    1 for _, p in filtered
+                    if str(p.risk_level).lower() in ['2', 'high']
+                )
 
                 elements.append(Paragraph(
                     '⚠️ Risk Summary', styles['section']
@@ -847,8 +853,14 @@ class PDFService:
                 risk_rows = [headers]
 
                 # ✅ Defined OUTSIDE the loop/list
-                risk_icons  = {2: '🟠', 3: '🔴'}
-                risk_labels = {2: 'High', 3: 'Critical'}
+                risk_icons = {
+                    '2': '🟠', 'high': '🟠',
+                    '3': '🔴', 'critical': '🔴'
+                }
+                risk_labels = {
+                    '2': 'High', 'high': 'High',
+                    '3': 'Critical', 'critical': 'Critical'
+                }
 
                 for student, pred in filtered:
                     academic = db.query(AcademicRecord).filter(
@@ -856,8 +868,9 @@ class PDFService:
                     ).order_by(AcademicRecord.recorded_date.desc()).first()
 
                     att       = PDFService._get_attendance_stats(db, student.id)
-                    risk_icon = risk_icons.get(pred.risk_level, '🔴')
-                    risk_text = risk_labels.get(pred.risk_level, str(pred.risk_level))
+                    risk_key = str(pred.risk_level).lower()
+                    risk_icon = risk_icons.get(risk_key, '🔴')
+                    risk_text = risk_labels.get(risk_key, str(pred.risk_level))
 
                     risk_rows.append([
                         f"{student.first_name} {student.last_name}",

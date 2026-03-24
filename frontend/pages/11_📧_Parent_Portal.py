@@ -1,4 +1,4 @@
-﻿"""
+"""
 Parent Communication Portal
 ScholarSense - AI-Powered Academic Intelligence System
 Enhancement 9: Send emails, view history, manage templates
@@ -147,6 +147,8 @@ def api_post(endpoint, payload):
 def get_all_students():
     """Fetch all active students"""
     res = api_get("/students")
+    if isinstance(res, dict) and 'students' in res:
+        return res['students']
     return res if isinstance(res, list) else []
 
 def get_at_risk_students():
@@ -336,10 +338,11 @@ st.markdown("---")
 # ============================================
 # TABS
 # ============================================
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "📤 Send Email",
     "📋 History",
-    "📄 Templates"
+    "📄 Templates",
+    "📎 Send Report via Email"
 ])
 
 
@@ -1097,4 +1100,193 @@ with tab3:
             </ul>
         </div>
         """, unsafe_allow_html=True)
+
+
+# ============================================================
+# TAB 4 — SEND REPORT VIA EMAIL (NEW)
+# ============================================================
+with tab4:
+    st.markdown("### 📎 Generate & Email PDF Report to Parents")
+    st.markdown("Automatically generate a PDF report and send it to the parent's email.")
+    st.markdown("---")
+
+    # ── Send Mode ──────────────────────────────────────────
+    report_mode = st.radio(
+        "📌 Select Mode",
+        options=["👤 Single Student", "📚 Batch by Grade & Section"],
+        horizontal=True
+    )
+
+    st.markdown("---")
+
+    # ── Load students ──────────────────────────────────────
+    with st.spinner("Loading students..."):
+        all_students = get_all_students()
+
+    if not all_students:
+        st.warning("⚠️ No students found.")
+    else:
+        # ============================================================
+        # SINGLE STUDENT MODE
+        # ============================================================
+        if report_mode == "👤 Single Student":
+            st.markdown("#### 👤 Select Student")
+
+            student_options = {
+                f"{s['student_id']} — {s['first_name']} {s['last_name']} "
+                f"(Grade {s['grade']}{s.get('section', '')})": s
+                for s in all_students
+            }
+
+            sc1, sc2 = st.columns([3, 1])
+            with sc1:
+                sel_label = st.selectbox(
+                    "Select Student",
+                    options=list(student_options.keys()),
+                    key="report_student_select"
+                )
+            sel_student = student_options[sel_label]
+            parent_email = sel_student.get('parent_email', '')
+
+            with sc2:
+                st.markdown("<br/>", unsafe_allow_html=True)
+                if parent_email:
+                    st.success(f"📧 {parent_email}")
+                else:
+                    st.error("❌ No parent email")
+
+            st.markdown("---")
+
+            if not parent_email:
+                st.error("❌ Cannot send — no parent email on file for this student.")
+            else:
+                st.info(f"📄 A PDF report will be generated for **{sel_student['first_name']} {sel_student['last_name']}** and emailed to **{parent_email}**")
+
+                if st.button("📨 Generate & Send Report", type="primary", width='stretch', key="single_report_send"):
+                    token = st.session_state.get('token', '')
+
+                    with st.spinner("⏳ Generating PDF..."):
+                        pdf_res = requests.get(
+                            f"http://localhost:5000/api/reports/student/{sel_student['id']}",
+                            headers={"Authorization": f"Bearer {token}"},
+                            timeout=30
+                        )
+
+                    if pdf_res.status_code != 200:
+                        st.error("❌ PDF generation failed. Make sure `reportlab` is installed.")
+                    else:
+                        # Send email with PDF attachment
+                        with st.spinner("📤 Sending email with PDF attachment..."):
+                            email_payload = {
+                                'student_id': sel_student['id'],
+                                'communication_type': 'Marks Report',
+                                'extra_data': {'attach_pdf': True},
+                                'pdf_report': True
+                            }
+                            result = api_post("/communications/send-report", email_payload)
+
+                        if result.get('status') == 'success':
+                            st.success(f"✅ PDF Report emailed successfully to **{parent_email}**!")
+                            st.balloons()
+                        else:
+                            # Fallback: just show download if email fails
+                            st.warning("⚠️ Email sending failed — download the PDF manually below.")
+                            st.download_button(
+                                label="⬇️ Download PDF Report",
+                                data=pdf_res.content,
+                                file_name=f"report_{sel_student['student_id']}.pdf",
+                                mime="application/pdf"
+                            )
+
+        # ============================================================
+        # BATCH MODE
+        # ============================================================
+        else:
+            st.markdown("#### 📚 Select Grade & Section")
+
+            bc1, bc2 = st.columns(2)
+            with bc1:
+                sel_grade = st.selectbox("🎓 Grade", options=GRADES, key="report_grade")
+            with bc2:
+                sel_section = st.selectbox(
+                    "📌 Section",
+                    options=["All Sections", "A", "B", "C", "D", "E"],
+                    key="report_section"
+                )
+
+            # Filter students
+            filtered_students = [
+                s for s in all_students
+                if s.get('grade') == sel_grade and (
+                    sel_section == "All Sections" or
+                    s.get('section') == sel_section
+                )
+            ]
+
+            with_email = [s for s in filtered_students if s.get('parent_email')]
+            no_email   = [s for s in filtered_students if not s.get('parent_email')]
+
+            st.markdown("---")
+
+            # Preview table
+            if not filtered_students:
+                st.warning(f"⚠️ No students found for Grade {sel_grade}" +
+                          (f" Section {sel_section}" if sel_section != "All Sections" else ""))
+            else:
+                preview_rows = [{
+                    'Student': f"{s['first_name']} {s['last_name']}",
+                    'ID': s['student_id'],
+                    'Grade': f"{s['grade']}{s.get('section','')}",
+                    'Parent Email': s.get('parent_email') or '❌ No email'
+                } for s in filtered_students]
+
+                st.dataframe(pd.DataFrame(preview_rows), width='stretch', hide_index=True)
+
+                st.info(
+                    f"✅ **{len(with_email)}** students have parent email  |  "
+                    f"❌ **{len(no_email)}** students have no email (will be skipped)"
+                )
+
+                st.markdown("---")
+                st.warning(f"⚠️ This will generate and email **{len(with_email)} PDF reports**. This may take a few minutes.")
+
+                if st.button(
+                    f"📨 Generate & Send {len(with_email)} PDF Reports",
+                    type="primary", width='stretch',
+                    key="batch_report_send",
+                    disabled=len(with_email) == 0
+                ):
+                    token = st.session_state.get('token', '')
+                    progress = st.progress(0, text="Starting...")
+                    success_count = 0
+                    fail_count = 0
+
+                    for idx, student in enumerate(with_email):
+                        progress.progress(
+                            int((idx + 1) / len(with_email) * 100),
+                            text=f"📤 Sending report for {student['first_name']}... ({idx+1}/{len(with_email)})"
+                        )
+                        pdf_res = requests.get(
+                            f"http://localhost:5000/api/reports/student/{student['id']}",
+                            headers={"Authorization": f"Bearer {token}"},
+                            timeout=30
+                        )
+                        if pdf_res.status_code == 200:
+                            result = api_post("/communications/send-report", {
+                                'student_id': student['id'],
+                                'communication_type': 'Marks Report',
+                                'extra_data': {'attach_pdf': True},
+                                'pdf_report': True
+                            })
+                            if result.get('status') == 'success':
+                                success_count += 1
+                            else:
+                                fail_count += 1
+                        else:
+                            fail_count += 1
+
+                    progress.progress(100, text="✅ Done!")
+                    st.success(f"✅ Batch complete! **{success_count}** sent | **{fail_count}** failed")
+                    if success_count > 0:
+                        st.balloons()
 

@@ -1,8 +1,17 @@
 # backend/routes/communication_routes.py
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email import encoders
 
 from backend.services.communication_service import CommunicationService
+from backend.services.pdf_service import PDFService
+from backend.database.db_config import SessionLocal
+from backend.database.models import Student
 
 communication_bp = Blueprint('communications', __name__)
 
@@ -109,3 +118,67 @@ def get_student_communications(student_id):
     except Exception as e:
         print(f"❌ Get student comms error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+# POST /api/communications/send-report
+@communication_bp.route('/api/communications/send-report', methods=['POST'])
+@jwt_required()
+def send_report_email():
+    data       = request.get_json() or {}
+    student_id = data.get('student_id')
+    db = SessionLocal()
+    try:
+        if not student_id:
+            return jsonify({'status': 'error', 'message': 'student_id is required'}), 400
+
+        student = db.query(Student).filter(Student.id == student_id).first()
+        if not student or not student.parent_email:
+            return jsonify({'status': 'error', 'message': 'No parent email'}), 400
+
+        # Generate PDF
+        pdf_bytes = PDFService.generate_student_report(student_id)
+
+        # Build email
+        email_user = os.getenv('EMAIL_USER')
+        email_password = os.getenv('EMAIL_PASSWORD')
+        email_host = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+        email_port = int(os.getenv('EMAIL_PORT', 587))
+        from_name = os.getenv('EMAIL_FROM_NAME', 'ScholarSense')
+
+        if not email_user or not email_password:
+            return jsonify({'status': 'error', 'message': 'Email credentials are not configured'}), 500
+
+        msg = MIMEMultipart()
+        msg['From']    = f"{from_name} <{email_user}>"
+        msg['To']      = student.parent_email
+        msg['Subject'] = f"Academic Report - {student.first_name} {student.last_name}"
+
+        body = (
+            f"Dear {student.parent_name or 'Parent'},\n\n"
+            f"Please find attached the academic report for {student.first_name}.\n\n"
+            "Regards,\nScholarSense"
+        )
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Attach PDF
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(pdf_bytes)
+        encoders.encode_base64(part)
+        part.add_header(
+            'Content-Disposition',
+            f'attachment; filename="report_{student.student_id}.pdf"'
+        )
+        msg.attach(part)
+
+        # Send
+        with smtplib.SMTP(email_host, email_port) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(email_user, email_password)
+            server.send_message(msg)
+
+        return jsonify({'status': 'success', 'message': 'Report emailed'}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        db.close()
