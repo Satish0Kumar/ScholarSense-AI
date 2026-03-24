@@ -1,4 +1,4 @@
-﻿"""
+"""
 Advanced Analytics Dashboard
 ScholarSense - AI-Powered Academic Intelligence System
 Enhancement 10: School-wide executive analytics & insights
@@ -226,7 +226,6 @@ st.markdown(f"""
 # FETCH ALL DATA UPFRONT
 # ============================================
 _token = st.session_state.get('token', '')
-st.code(_token)   # ← shows your token on screen
 
 
 with st.spinner("📊 Loading school analytics..."):

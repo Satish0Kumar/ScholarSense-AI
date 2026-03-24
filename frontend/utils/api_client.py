@@ -161,6 +161,27 @@ class APIClient:
             return {'error': response.json().get('error', 'Failed to create student')}
         except Exception as e:
             return {'error': str(e)}
+
+    @staticmethod
+    def delete_student(student_id: int, permanent: bool = False) -> Dict:
+        """Delete/deactivate student by ID"""
+        try:
+            response = requests.delete(
+                f"{APIClient.BASE_URL}/students/{student_id}",
+                headers=APIClient.get_headers(),
+                params={'permanent': str(permanent).lower()},
+                timeout=10
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            try:
+                return {'error': response.json().get('error', 'Failed to delete student')}
+            except Exception:
+                return {'error': f'Failed to delete student (HTTP {response.status_code})'}
+        except Exception as e:
+            return {'error': str(e)}
     
     @staticmethod
     def get_students_count() -> int:

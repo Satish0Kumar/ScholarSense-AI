@@ -2,12 +2,33 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token, get_jwt
 from datetime import timedelta
+import json
+import time
 
 from backend.auth.auth_service import AuthService
 from backend.services.otp_service import OtpService
 from backend.services.email_service import EmailService
 
 auth_bp = Blueprint('auth', __name__)
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
+    # region agent log
+    try:
+        payload = {
+            "sessionId": "883215",
+            "runId": f"auth-debug-{int(time.time() * 1000)}",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000)
+        }
+        with open("debug-883215.log", "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload) + "\n")
+    except Exception:
+        pass
+    # endregion
 
 
 # ============================================
@@ -28,14 +49,21 @@ def login():
 
         result = AuthService.login(email, password)
         if not result:
-            print(f"❌ Login failed: {email}")
+            print(f"Login failed: {email}")
             return jsonify({'error': 'Invalid credentials'}), 401
 
         user    = result['user']
         user_id = user['id']
+        _debug_log("H4", "auth_routes.py:login:before_create_otp", "About to create OTP", {
+            "userIdType": type(user_id).__name__,
+            "emailDomain": user.get("email", "").split("@")[-1] if user.get("email") else ""
+        })
 
         otp_data = OtpService.create_otp(user_id)
         if 'error' in otp_data:
+            _debug_log("H1", "auth_routes.py:login:otp_error", "OTP generation returned error", {
+                "error": str(otp_data.get("error", ""))[:300]
+            })
             return jsonify({'error': 'Failed to generate OTP'}), 500
 
         email_result = EmailService.send_otp_email(
@@ -47,7 +75,7 @@ def login():
             return jsonify({'error': 'Failed to send OTP email'}), 500
 
         masked_email = OtpService.mask_email(user['email'])
-        print(f"✅ OTP sent to {user['email']} for user {user_id}")
+        print(f"OTP sent to {user['email']} for user {user_id}")
 
         return jsonify({
             'status' : 'otp_sent',
@@ -57,7 +85,7 @@ def login():
         }), 200
 
     except Exception as e:
-        print(f"❌ Login error: {e}")
+        print(f"Login error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -98,11 +126,11 @@ def verify_otp():
         if not token_result:
             return jsonify({'error': 'Failed to generate token'}), 500
 
-        print(f"✅ 2FA login complete for user {user_id}")
+        print(f"2FA login complete for user {user_id}")
         return jsonify(token_result), 200
 
     except Exception as e:
-        print(f"❌ OTP verify error: {e}")
+        print(f"OTP verify error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -137,7 +165,7 @@ def resend_otp():
             return jsonify({'error': 'Failed to send OTP email'}), 500
 
         masked_email = OtpService.mask_email(user['email'])
-        print(f"✅ OTP resent to {user['email']} for user {user_id}")
+        print(f"OTP resent to {user['email']} for user {user_id}")
 
         return jsonify({
             'status' : 'otp_sent',
@@ -146,7 +174,7 @@ def resend_otp():
         }), 200
 
     except Exception as e:
-        print(f"❌ Resend OTP error: {e}")
+        print(f"Resend OTP error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -162,7 +190,7 @@ def verify_token():
             return jsonify(user), 200
         return jsonify({'error': 'User not found'}), 404
     except Exception as e:
-        print(f"❌ Verify error: {e}")
+        print(f"Verify error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -174,10 +202,10 @@ def verify_token():
 def logout():
     try:
         user_id = get_jwt_identity()
-        print(f"📤 User {user_id} logged out")
+        print(f"User {user_id} logged out")
         return jsonify({'message': 'Logged out successfully'}), 200
     except Exception as e:
-        print(f"❌ Logout error: {e}")
+        print(f"Logout error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -193,7 +221,7 @@ def get_current_user_info():
             return jsonify(user), 200
         return jsonify({'error': 'User not found'}), 404
     except Exception as e:
-        print(f"❌ Get user error: {e}")
+        print(f"Get user error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -219,12 +247,12 @@ def refresh_token():
             expires_delta=timedelta(hours=8)  # Same expiration as login
         )
 
-        print(f"🔄 Token refreshed for user {user_id}")
+        print(f"Token refreshed for user {user_id}")
         return jsonify({
             'access_token': new_access_token,
             'message': 'Token refreshed successfully'
         }), 200
 
     except Exception as e:
-        print(f"❌ Token refresh error: {e}")
+        print(f"Token refresh error: {e}")
         return jsonify({'error': 'Internal server error'}), 500

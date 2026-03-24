@@ -94,35 +94,35 @@ class EmailService:
             server.sendmail(EMAIL_USER, to_email, msg.as_string())
             server.quit()
 
-            print(f"✅ Email sent to {to_email} | Subject: {subject}")
+            print(f"Email sent to {to_email} | Subject: {subject}")
             return {
                 'status' : 'sent',
                 'message': f'Email sent to {to_email}'
             }
 
         except smtplib.SMTPAuthenticationError:
-            print(f"❌ SMTP Authentication failed. Check EMAIL_USER and EMAIL_PASSWORD in .env")
+            print("SMTP Authentication failed. Check EMAIL_USER and EMAIL_PASSWORD in .env")
             return {
                 'status' : 'failed',
                 'message': 'Email authentication failed. Check credentials in .env'
             }
 
         except smtplib.SMTPRecipientsRefused:
-            print(f"❌ Recipient refused: {to_email}")
+            print(f"Recipient refused: {to_email}")
             return {
                 'status' : 'failed',
                 'message': f'Invalid recipient email: {to_email}'
             }
 
         except smtplib.SMTPException as e:
-            print(f"❌ SMTP error: {e}")
+            print(f"SMTP error: {e}")
             return {
                 'status' : 'failed',
                 'message': f'SMTP error: {str(e)}'
             }
 
         except Exception as e:
-            print(f"❌ Email send error: {e}")
+            print(f"Email send error: {e}")
             return {
                 'status' : 'failed',
                 'message': str(e)
@@ -548,7 +548,7 @@ Greenwood High School
         try:
             server = EmailService._get_smtp_connection()
             server.quit()
-            print(f"✅ SMTP connection successful ({EMAIL_HOST}:{EMAIL_PORT})")
+            print(f"SMTP connection successful ({EMAIL_HOST}:{EMAIL_PORT})")
             return {
                 'status' : 'connected',
                 'message': f'SMTP connected to {EMAIL_HOST}:{EMAIL_PORT}',
@@ -557,7 +557,7 @@ Greenwood High School
         except ValueError as e:
             return {'status': 'failed', 'message': str(e)}
         except Exception as e:
-            print(f"❌ SMTP connection failed: {e}")
+            print(f"SMTP connection failed: {e}")
             return {
                 'status' : 'failed',
                 'message': str(e)

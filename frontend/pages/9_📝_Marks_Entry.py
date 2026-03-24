@@ -1,4 +1,4 @@
-﻿"""
+"""
 Marks Entry Module
 ScholarSense - AI-Powered Academic Intelligence System
 Enhancement 6: Marks Entry - Enter Marks, Analytics, Failed Students
@@ -262,199 +262,198 @@ with tab1:
 
     if not students:
         st.warning("⚠️ No students found for the selected grade/section.")
-        st.stop()
-
-    student_options = {
-        f"{s['student_id']} — {s['first_name']} {s['last_name']} "
-        f"(Grade {s['grade']}{s.get('section', '')})": s['id']
-        for s in students
-    }
-
-    s2c1, s2c2 = st.columns([3, 1])
-    with s2c1:
-        sel_student_label = st.selectbox(
-            "👤 Student *",
-            options=list(student_options.keys())
-        )
-    with s2c2:
-        sel_exam_type = st.selectbox(
-            "📋 Exam Type *",
-            options=EXAM_TYPES,
-            index=2   # default Mid Term
-        )
-
-    sel_student_id = student_options[sel_student_label]
-
-    st.markdown("---")
-
-    # ── Step 3: Enter Scores ───────────────────────────────
-    st.markdown("#### 🔢 Step 3 — Enter Subject Scores (out of 100)")
-    st.caption(f"⚡ Pass mark: **{int(PASS_MARK)}** | GPA auto-calculated as average of all 5 subjects")
-
-    with st.form("marks_entry_form", clear_on_submit=False):
-        sc1, sc2, sc3, sc4, sc5 = st.columns(5)
-
-        with sc1:
-            math_score = st.number_input(
-                "🔢 Mathematics",
-                min_value=0.0, max_value=100.0,
-                value=0.0, step=0.5,
-                format="%.1f"
-            )
-        with sc2:
-            science_score = st.number_input(
-                "🔬 Science",
-                min_value=0.0, max_value=100.0,
-                value=0.0, step=0.5,
-                format="%.1f"
-            )
-        with sc3:
-            english_score = st.number_input(
-                "📖 English",
-                min_value=0.0, max_value=100.0,
-                value=0.0, step=0.5,
-                format="%.1f"
-            )
-        with sc4:
-            social_score = st.number_input(
-                "🌍 Social Studies",
-                min_value=0.0, max_value=100.0,
-                value=0.0, step=0.5,
-                format="%.1f"
-            )
-        with sc5:
-            language_score = st.number_input(
-                "🗣️ Language",
-                min_value=0.0, max_value=100.0,
-                value=0.0, step=0.5,
-                format="%.1f"
-            )
-
-        # ── Assignment rate + Remarks ──────────────────────
-        r1c1, r1c2 = st.columns([1, 2])
-        with r1c1:
-            assignment_rate = st.slider(
-                "📚 Assignment Submission Rate (%)",
-                min_value=0, max_value=100,
-                value=100, step=5
-            )
-        with r1c2:
-            remarks = st.text_input(
-                "🗒️ Remarks (optional)",
-                placeholder="e.g., Absent for Science paper, re-test scheduled..."
-            )
-
-        st.markdown("---")
-
-        # ── Live Preview ───────────────────────────────────
-        all_scores   = [math_score, science_score, english_score,
-                        social_score, language_score]
-        live_gpa     = round(sum(all_scores) / 5, 2)
-        live_total   = round(sum(all_scores), 2)
-        live_failed  = sum(1 for s in all_scores if s < PASS_MARK)
-        live_result  = "✅ PASS" if live_failed == 0 else f"❌ FAIL ({live_failed} subject{'s' if live_failed > 1 else ''})"
-
-        st.markdown("##### 👁️ Live Preview")
-        pv1, pv2, pv3, pv4 = st.columns(4)
-        pv1.metric("📊 GPA",           f"{live_gpa}%")
-        pv2.metric("🔢 Total Marks",   f"{live_total}/500")
-        pv3.metric("❌ Failed Subjects", live_failed)
-        pv4.metric("🏆 Result",         live_result)
-
-        # Subject pass/fail indicators
-        subj_names  = ["Math", "Science", "English", "Social", "Language"]
-        ind_cols    = st.columns(5)
-        for idx, (col, score, name) in enumerate(
-            zip(ind_cols, all_scores, subj_names)
-        ):
-            status = "🟢" if score >= PASS_MARK else "🔴"
-            col.markdown(
-                f"<div style='text-align:center; font-size:0.85rem;'>"
-                f"{status} <b>{name}</b><br/>{score:.1f}%</div>",
-                unsafe_allow_html=True
-            )
-
-        st.markdown("---")
-        submit_btn = st.form_submit_button(
-            "💾 Save Marks",
-            width='stretch',
-            type="primary"
-        )
-
-    # ── Handle Submission ──────────────────────────────────
-    if submit_btn:
-        payload = {
-            "student_id":                sel_student_id,
-            "semester":                  sel_semester,
-            "exam_type":                 sel_exam_type,
-            "math_score":                math_score,
-            "science_score":             science_score,
-            "english_score":             english_score,
-            "social_score":              social_score,
-            "language_score":            language_score,
-            "assignment_submission_rate": float(assignment_rate),
-            "remarks":                   remarks.strip() or None
+        st.info("You can still use the Analytics and Failed Students tabs.")
+    else:
+        student_options = {
+            f"{s['student_id']} — {s['first_name']} {s['last_name']} "
+            f"(Grade {s['grade']}{s.get('section', '')})": s['id']
+            for s in students
         }
 
-        with st.spinner("💾 Saving marks..."):
-            result = api_post("/marks/entry", payload)
+        s2c1, s2c2 = st.columns([3, 1])
+        with s2c1:
+            sel_student_label = st.selectbox(
+                "👤 Student *",
+                options=list(student_options.keys())
+            )
+        with s2c2:
+            sel_exam_type = st.selectbox(
+                "📋 Exam Type *",
+                options=EXAM_TYPES,
+                index=2   # default Mid Term
+            )
 
-        if result.get('status') == 'success':
-            action = result.get('action', 'saved')
-            st.markdown(f"""
-            <div style="
-                background: #065f46;
-                border: 2px solid #10b981;
-                border-radius: 12px;
-                padding: 1.2rem 1.5rem;
-                margin: 1rem 0;
-            ">
-                <p style="color: #ffffff; font-size: 1rem; font-weight: 700; margin: 0;">
-                    ✅ Marks saved successfully!
-                </p>
-                <p style="color: #d1fae5; font-size: 0.9rem; margin: 0.4rem 0 0 0;">
-                    📊 GPA: {live_gpa:.1f}%  |  🔢 Total: {live_total:.1f}/500  |  ❌ Failed: {live_failed} subject(s)
-                </p>
-                <p style="color: #a7f3d0; font-size: 0.85rem; margin: 0.3rem 0 0 0;">
-                    🤖 Academic records updated → ML model will use latest scores
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-            st.balloons()
+        sel_student_id = student_options[sel_student_label]
 
-            # 🔄 Sync to academic_records so ML model sees latest marks
-            from backend.services.prediction_service import PredictionService
-            saved_id = result.get('data', {}).get('id')
-            if saved_id:
-                sync_result = PredictionService.sync_marks_to_academic_record(
-                    sel_student_id, saved_id    # ← correct variable name
+        st.markdown("---")
+
+        # ── Step 3: Enter Scores ───────────────────────────────
+        st.markdown("#### 🔢 Step 3 — Enter Subject Scores (out of 100)")
+        st.caption(f"⚡ Pass mark: **{int(PASS_MARK)}** | GPA auto-calculated as average of all 5 subjects")
+
+        with st.form("marks_entry_form", clear_on_submit=False):
+            sc1, sc2, sc3, sc4, sc5 = st.columns(5)
+
+            with sc1:
+                math_score = st.number_input(
+                    "🔢 Mathematics",
+                    min_value=0.0, max_value=100.0,
+                    value=0.0, step=0.5,
+                    format="%.1f"
                 )
-                if sync_result.get('status') == 'success':
-                    st.info("🔄 Academic record synced for ML predictions")
-                else:
-                    st.warning(f"⚠️ Sync warning: {sync_result.get('error')}")
+            with sc2:
+                science_score = st.number_input(
+                    "🔬 Science",
+                    min_value=0.0, max_value=100.0,
+                    value=0.0, step=0.5,
+                    format="%.1f"
+                )
+            with sc3:
+                english_score = st.number_input(
+                    "📖 English",
+                    min_value=0.0, max_value=100.0,
+                    value=0.0, step=0.5,
+                    format="%.1f"
+                )
+            with sc4:
+                social_score = st.number_input(
+                    "🌍 Social Studies",
+                    min_value=0.0, max_value=100.0,
+                    value=0.0, step=0.5,
+                    format="%.1f"
+                )
+            with sc5:
+                language_score = st.number_input(
+                    "🗣️ Language",
+                    min_value=0.0, max_value=100.0,
+                    value=0.0, step=0.5,
+                    format="%.1f"
+                )
 
+            # ── Assignment rate + Remarks ──────────────────────
+            r1c1, r1c2 = st.columns([1, 2])
+            with r1c1:
+                assignment_rate = st.slider(
+                    "📚 Assignment Submission Rate (%)",
+                    min_value=0, max_value=100,
+                    value=100, step=5
+                )
+            with r1c2:
+                remarks = st.text_input(
+                    "🗒️ Remarks (optional)",
+                    placeholder="e.g., Absent for Science paper, re-test scheduled..."
+                )
 
-            # Show result summary
-            rec = result['data']
-            st.markdown(f"""
-            <div style='background:#065f46; padding:1rem 1.5rem;
-                        border-radius:10px; border-left:5px solid #10b981;
-                        margin-top:1rem; color:#ffffff;'>
-                <b>📋 Marks Summary</b><br/>
-                👤 Student: <b>{sel_student_label.split(' — ')[0]}</b> &nbsp;|&nbsp;
-                📋 Exam: <b>{sel_exam_type}</b> &nbsp;|&nbsp;
-                📅 Semester: <b>{sel_semester}</b><br/>
-                📊 GPA: <b>{rec.get('gpa')}%</b> &nbsp;|&nbsp;
-                🔢 Total: <b>{rec.get('total_marks')}/500</b> &nbsp;|&nbsp;
-                ❌ Failed: <b>{rec.get('failed_subjects')} subject(s)</b><br/>
-                🤖 <i style="color:#a7f3d0;">
-                    Academic records updated → ML model will use latest scores
-                </i>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.error(f"❌ Failed: {result.get('message', 'Unknown error')}")
+            st.markdown("---")
+
+            # ── Live Preview ───────────────────────────────────
+            all_scores   = [math_score, science_score, english_score,
+                            social_score, language_score]
+            live_gpa     = round(sum(all_scores) / 5, 2)
+            live_total   = round(sum(all_scores), 2)
+            live_failed  = sum(1 for s in all_scores if s < PASS_MARK)
+            live_result  = "✅ PASS" if live_failed == 0 else f"❌ FAIL ({live_failed} subject{'s' if live_failed > 1 else ''})"
+
+            st.markdown("##### 👁️ Live Preview")
+            pv1, pv2, pv3, pv4 = st.columns(4)
+            pv1.metric("📊 GPA",           f"{live_gpa}%")
+            pv2.metric("🔢 Total Marks",   f"{live_total}/500")
+            pv3.metric("❌ Failed Subjects", live_failed)
+            pv4.metric("🏆 Result",         live_result)
+
+            # Subject pass/fail indicators
+            subj_names  = ["Math", "Science", "English", "Social", "Language"]
+            ind_cols    = st.columns(5)
+            for idx, (col, score, name) in enumerate(
+                zip(ind_cols, all_scores, subj_names)
+            ):
+                status = "🟢" if score >= PASS_MARK else "🔴"
+                col.markdown(
+                    f"<div style='text-align:center; font-size:0.85rem;'>"
+                    f"{status} <b>{name}</b><br/>{score:.1f}%</div>",
+                    unsafe_allow_html=True
+                )
+
+            st.markdown("---")
+            submit_btn = st.form_submit_button(
+                "💾 Save Marks",
+                width='stretch',
+                type="primary"
+            )
+
+        # ── Handle Submission ──────────────────────────────────
+        if submit_btn:
+            payload = {
+                "student_id":                sel_student_id,
+                "semester":                  sel_semester,
+                "exam_type":                 sel_exam_type,
+                "math_score":                math_score,
+                "science_score":             science_score,
+                "english_score":             english_score,
+                "social_score":              social_score,
+                "language_score":            language_score,
+                "assignment_submission_rate": float(assignment_rate),
+                "remarks":                   remarks.strip() or None
+            }
+
+            with st.spinner("💾 Saving marks..."):
+                result = api_post("/marks/entry", payload)
+
+            if result.get('status') == 'success':
+                action = result.get('action', 'saved')
+                st.markdown(f"""
+                <div style="
+                    background: #065f46;
+                    border: 2px solid #10b981;
+                    border-radius: 12px;
+                    padding: 1.2rem 1.5rem;
+                    margin: 1rem 0;
+                ">
+                    <p style="color: #ffffff; font-size: 1rem; font-weight: 700; margin: 0;">
+                        ✅ Marks saved successfully!
+                    </p>
+                    <p style="color: #d1fae5; font-size: 0.9rem; margin: 0.4rem 0 0 0;">
+                        📊 GPA: {live_gpa:.1f}%  |  🔢 Total: {live_total:.1f}/500  |  ❌ Failed: {live_failed} subject(s)
+                    </p>
+                    <p style="color: #a7f3d0; font-size: 0.85rem; margin: 0.3rem 0 0 0;">
+                        🤖 Academic records updated → ML model will use latest scores
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                st.balloons()
+
+                # 🔄 Sync to academic_records so ML model sees latest marks
+                from backend.services.prediction_service import PredictionService
+                saved_id = result.get('data', {}).get('id')
+                if saved_id:
+                    sync_result = PredictionService.sync_marks_to_academic_record(
+                        sel_student_id, saved_id    # ← correct variable name
+                    )
+                    if sync_result.get('status') == 'success':
+                        st.info("🔄 Academic record synced for ML predictions")
+                    else:
+                        st.warning(f"⚠️ Sync warning: {sync_result.get('error')}")
+
+                # Show result summary
+                rec = result['data']
+                st.markdown(f"""
+                <div style='background:#065f46; padding:1rem 1.5rem;
+                            border-radius:10px; border-left:5px solid #10b981;
+                            margin-top:1rem; color:#ffffff;'>
+                    <b>📋 Marks Summary</b><br/>
+                    👤 Student: <b>{sel_student_label.split(' — ')[0]}</b> &nbsp;|&nbsp;
+                    📋 Exam: <b>{sel_exam_type}</b> &nbsp;|&nbsp;
+                    📅 Semester: <b>{sel_semester}</b><br/>
+                    📊 GPA: <b>{rec.get('gpa')}%</b> &nbsp;|&nbsp;
+                    🔢 Total: <b>{rec.get('total_marks')}/500</b> &nbsp;|&nbsp;
+                    ❌ Failed: <b>{rec.get('failed_subjects')} subject(s)</b><br/>
+                    🤖 <i style="color:#a7f3d0;">
+                        Academic records updated → ML model will use latest scores
+                    </i>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.error(f"❌ Failed: {result.get('message', 'Unknown error')}")
 
 
 # ============================================================

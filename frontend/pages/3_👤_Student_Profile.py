@@ -1,4 +1,4 @@
-﻿"""
+"""
 Student Profile - Detailed View
 ScholarSense - AI-Powered Academic Intelligence System
 """
@@ -342,21 +342,9 @@ with tab1:
                 "language_score":              language_score,
             }
             try:
-                # ✅ REPLACE WITH:
-                payload['student_id'] = student_id   # make sure student_id is in body
-
+                payload['student_id'] = student_id
                 resp = requests.post(
-                    f"{API_BASE}/academics",          # ← correct route
-                    headers=get_auth_headers(),
-                    json=payload,
-                    timeout=10
-                )
-
-                # ✅ REPLACE WITH:
-                payload['student_id'] = student_id  # ensure student_id is in body
-
-                resp = requests.post(
-                    f"{API_BASE}/academics",        # ← fixed URL
+                    f"{API_BASE}/academics",
                     headers=get_auth_headers(),
                     json=payload,
                     timeout=10

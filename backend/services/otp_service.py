@@ -12,6 +12,8 @@ Handles:
 import secrets
 import hashlib
 import string
+import json
+import time
 from datetime import datetime, timedelta
 from collections import defaultdict
 from backend.database.db_config import SessionLocal
@@ -37,6 +39,25 @@ RATE_LIMIT_WINDOW  = 3600   # 1 hour in seconds
 
 # In-memory rate limiting (use Redis in production)
 otp_request_counts = defaultdict(list)
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
+    # region agent log
+    try:
+        payload = {
+            "sessionId": "883215",
+            "runId": f"otp-debug-{int(time.time() * 1000)}",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000)
+        }
+        with open("debug-883215.log", "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload) + "\n")
+    except Exception:
+        pass
+    # endregion
 
 
 class OtpService:
@@ -122,9 +143,17 @@ class OtpService:
         """
         db = SessionLocal()
         try:
+            _debug_log("H4", "otp_service.py:create_otp:entry", "Create OTP called", {
+                "userIdType": type(user_id).__name__,
+                "userIdPresent": user_id is not None
+            })
             # ── Check rate limit ─────────────────────────────────────────────
             rate_limit = OtpService.check_rate_limit(user_id)
             if not rate_limit.get('allowed', False):
+                _debug_log("H1", "otp_service.py:create_otp:rate_limit", "Rate limit blocked OTP", {
+                    "allowed": rate_limit.get("allowed"),
+                    "hasMessage": bool(rate_limit.get("message"))
+                })
                 return {
                     'error': rate_limit.get('message', 'Rate limit exceeded')
                 }
@@ -132,6 +161,10 @@ class OtpService:
             # ── Check for lockout ───────────────────────────────────────────
             lockout_check = OtpService._check_lockout(db, user_id)
             if lockout_check:
+                _debug_log("H2", "otp_service.py:create_otp:lockout", "Lockout blocked OTP", {
+                    "status": lockout_check.get("status"),
+                    "hasMessage": bool(lockout_check.get("message"))
+                })
                 return {
                     'error': lockout_check['message']
                 }
@@ -161,6 +194,10 @@ class OtpService:
             db.add(otp_token)
             db.commit()
             db.refresh(otp_token)
+            _debug_log("H3", "otp_service.py:create_otp:commit_ok", "OTP DB insert committed", {
+                "otpId": otp_token.id,
+                "userId": user_id
+            })
 
             # ── Record the request for rate limiting ───────────────────────
             OtpService.record_otp_request(user_id)
@@ -168,7 +205,7 @@ class OtpService:
             # ── Get user details for email ──────────────────────────────────
             user = db.query(User).filter(User.id == user_id).first()
 
-            print(f"✅ OTP created for user {user_id}: "
+            print(f"OTP created for user {user_id}: "
                   f"expires at {expires_at.strftime('%H:%M:%S')}")
 
             return {
@@ -182,7 +219,11 @@ class OtpService:
 
         except Exception as e:
             db.rollback()
-            print(f"❌ OTP creation error: {e}")
+            _debug_log("H3", "otp_service.py:create_otp:exception", "OTP creation exception", {
+                "errorType": type(e).__name__,
+                "error": str(e)[:300]
+            })
+            print(f"OTP creation error: {e}")
             return {'error': str(e)}
         finally:
             db.close()
@@ -242,7 +283,7 @@ class OtpService:
                     # Lock the OTP
                     otp_token.is_used = True
                     db.commit()
-                    print(f"🔒 User {user_id} locked out after "
+                    print(f"User {user_id} locked out after "
                           f"{MAX_OTP_ATTEMPTS} failed attempts")
                     return {
                         'status' : 'locked',
@@ -250,7 +291,7 @@ class OtpService:
                                     f'Account locked for {LOCKOUT_MINUTES} minutes.')
                     }
 
-                print(f"❌ Wrong OTP for user {user_id}. "
+                print(f"Wrong OTP for user {user_id}. "
                       f"{remaining} attempts remaining.")
                 return {
                     'status'   : 'invalid',
@@ -262,7 +303,7 @@ class OtpService:
             otp_token.is_used = True
             db.commit()
 
-            print(f"✅ OTP verified successfully for user {user_id}")
+            print(f"OTP verified successfully for user {user_id}")
             return {
                 'status' : 'valid',
                 'message': 'OTP verified successfully'
@@ -270,7 +311,7 @@ class OtpService:
 
         except Exception as e:
             db.rollback()
-            print(f"❌ OTP verification error: {e}")
+            print(f"OTP verification error: {e}")
             return {'status': 'error', 'message': str(e)}
         finally:
             db.close()
@@ -332,12 +373,12 @@ class OtpService:
                 db.delete(otp)
 
             db.commit()
-            print(f"🧹 Cleaned up {count} expired OTPs")
+            print(f"Cleaned up {count} expired OTPs")
             return count
 
         except Exception as e:
             db.rollback()
-            print(f"❌ Cleanup error: {e}")
+            print(f"Cleanup error: {e}")
             return 0
         finally:
             db.close()
