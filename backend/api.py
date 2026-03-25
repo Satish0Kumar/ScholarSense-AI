@@ -19,6 +19,15 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# ── Validate required secrets BEFORE any other imports ───────────────
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY environment variable is not set!")
+
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
+if not JWT_SECRET_KEY:
+    raise ValueError("JWT_SECRET_KEY environment variable is not set!")
+
 # ── Import services needed at startup ──────────────────────────────────
 from backend.database.db_config import test_connection, get_database_info
 from backend.services.prediction_service import PredictionService
@@ -33,14 +42,6 @@ from backend.routes import register_blueprints
 app = Flask(__name__)
 
 # ── Configuration ──────────────────────────────────────────────────────
-SECRET_KEY = os.getenv('SECRET_KEY')
-if not SECRET_KEY:
-    raise ValueError("SECRET_KEY environment variable is not set!")
-
-JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
-if not JWT_SECRET_KEY:
-    raise ValueError("JWT_SECRET_KEY environment variable is not set!")
-
 app.config['SECRET_KEY']                = SECRET_KEY
 app.config['JWT_SECRET_KEY']            = JWT_SECRET_KEY
 app.config['JWT_ACCESS_TOKEN_EXPIRES']  = int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES', 3600))
