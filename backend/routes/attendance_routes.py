@@ -42,6 +42,10 @@ def mark_attendance():
 @jwt_required()
 def mark_bulk_attendance():
     try:
+        claims = get_jwt()
+        if claims.get('role') not in ['admin', 'teacher']:
+            return jsonify({'error': 'Admin or Teacher access required'}), 403
+
         data            = request.get_json()
         attendance_list = data.get('attendance_list', [])
 

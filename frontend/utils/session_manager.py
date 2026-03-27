@@ -81,7 +81,7 @@ class SessionManager:
         if token and expiry:
             try:
                 expiry_dt = datetime.fromisoformat(expiry)
-                if datetime.now() < expiry_dt:
+                if datetime.utcnow() < expiry_dt:
                     # ✅ Valid session — restore it
                     st.session_state.authenticated = True
                     st.session_state.token         = token
@@ -96,7 +96,7 @@ class SessionManager:
     @staticmethod
     def set_session(token: str, user: dict):
         """Called after OTP verify — save to session + file"""
-        expiry_dt = datetime.now() + timedelta(hours=8)
+        expiry_dt = datetime.utcnow() + timedelta(hours=8)
 
         st.session_state.authenticated = True
         st.session_state.token         = token
@@ -132,7 +132,7 @@ class SessionManager:
         if not st.session_state.get('authenticated'):
             return False
         expiry = st.session_state.get('token_expiry')
-        if expiry and datetime.now() >= expiry:
+        if expiry and datetime.utcnow() >= expiry:
             SessionManager.logout()
             return False
         return True

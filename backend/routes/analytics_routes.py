@@ -13,22 +13,13 @@ from backend.database.models import (
 analytics_bp = Blueprint('analytics', __name__)
 
 
-def _db():
-    db = SessionLocal()
-    try:
-        return db
-    except Exception:
-        db.close()
-        raise
-
-
 # ─────────────────────────────────────────────────────────────
 # GET /api/analytics/school-overview
 # ─────────────────────────────────────────────────────────────
 @analytics_bp.route('/api/analytics/school-overview', methods=['GET'])
 @jwt_required()
 def get_school_overview():
-    db = _db()
+    db = SessionLocal()
     try:
 
         # ── 1. Total active students ──────────────────────────────
@@ -207,7 +198,7 @@ def get_school_overview():
 @jwt_required()
 def get_analytics_trends():
     months = request.args.get('months', 6, type=int)
-    db     = _db()
+    db     = SessionLocal()
     try:
         cutoff = datetime.utcnow() - timedelta(days=months * 30)
 
@@ -227,14 +218,14 @@ def get_analytics_trends():
 
         # Communication trend per month
         comm_rows = db.query(
-            func.to_char(Communication.created_at, 'Mon YYYY').label('month'),
+            func.to_char(Communication.sent_at, 'Mon YYYY').label('month'),
             func.count().label('count')
         ).filter(
-            Communication.created_at >= cutoff
+            Communication.sent_at >= cutoff
         ).group_by(
-            func.to_char(Communication.created_at, 'Mon YYYY')
+            func.to_char(Communication.sent_at, 'Mon YYYY')
         ).order_by(
-            func.min(Communication.created_at)
+            func.min(Communication.sent_at)
         ).all()
 
         comm_trends = [{'month': r.month, 'count': r.count} for r in comm_rows]

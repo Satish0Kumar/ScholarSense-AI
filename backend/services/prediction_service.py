@@ -74,7 +74,7 @@ class PredictionService:
         Prepare features for ML model from database
         Returns: dict with all required features
         """
-        db = next(get_db())
+        db = SessionLocal()
         try:
             # Get student
             student = db.query(Student).filter(Student.id == student_id).first()
@@ -101,7 +101,7 @@ class PredictionService:
             present_days = db.query(func.count(Attendance.id)).filter(
                 Attendance.student_id == student_id,
                 Attendance.attendance_date >= thirty_days_ago,
-                Attendance.status == 'Present'
+                Attendance.status == 'present'
             ).scalar() or 0
             
             attendance_rate = (present_days / total_days * 100) if total_days > 0 else 95.0
@@ -202,7 +202,7 @@ class PredictionService:
             predicted_by: User ID who requested prediction
         Returns: Prediction result with probabilities
         """
-        db = next(get_db())
+        db = SessionLocal()
         try:
             # Prepare features
             features = PredictionService.prepare_features(student_id)
@@ -338,7 +338,7 @@ class PredictionService:
     @staticmethod
     def get_student_predictions(student_id: int, limit: int = 10):
         """Get prediction history for a student"""
-        db = next(get_db())
+        db = SessionLocal()
         try:
             predictions = db.query(RiskPrediction).filter(
                 RiskPrediction.student_id == student_id
@@ -351,7 +351,7 @@ class PredictionService:
     @staticmethod
     def get_latest_prediction(student_id: int):
         """Get latest prediction for a student"""
-        db = next(get_db())
+        db = SessionLocal()
         try:
             prediction = db.query(RiskPrediction).filter(
                 RiskPrediction.student_id == student_id
@@ -366,7 +366,7 @@ class PredictionService:
     @staticmethod
     def get_high_risk_students(grade: int = None):
         """Get list of high-risk students"""
-        db = next(get_db())
+        db = SessionLocal()
         try:
             # Subquery to get latest prediction for each student (by ID for determinism)
             subquery = db.query(
@@ -400,7 +400,7 @@ class PredictionService:
     @staticmethod
     def sync_marks_to_academic_record(student_id: int, marks_entry_id: int):
         """Copy latest marks entry into academic_records so ML model sees it"""
-        db = next(get_db())
+        db = SessionLocal()
         try:
             from backend.database.models import MarksEntry
             marks = db.query(MarksEntry).filter(

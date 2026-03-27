@@ -13,22 +13,8 @@ auth_bp = Blueprint('auth', __name__)
 
 
 def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
-    # region agent log
-    try:
-        payload = {
-            "sessionId": "883215",
-            "runId": f"auth-debug-{int(time.time() * 1000)}",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000)
-        }
-        with open("debug-883215.log", "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload) + "\n")
-    except Exception:
-        pass
-    # endregion
+    # Disabled for production
+    pass
 
 
 # ============================================

@@ -9,10 +9,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 MODEL_DIR = BASE_DIR / "models" / "saved_models"
 DATA_DIR = BASE_DIR / "data"
 
-# API Configuration
-API_HOST = os.getenv("API_HOST", "127.0.0.1")
-API_PORT = int(os.getenv("API_PORT", 5000))
-DEBUG = os.getenv("FLASK_DEBUG", "True") == "True"
+# School Configuration
+SCHOOL_NAME = os.getenv("SCHOOL_NAME", "Greenwood High School")
+ACADEMIC_YEAR = os.getenv("ACADEMIC_YEAR", "2025-26")
 
 # Model paths
 MODEL_PATH = MODEL_DIR / "best_model.pkl"

@@ -39,6 +39,7 @@ RATE_LIMIT_WINDOW  = 3600   # 1 hour in seconds
 
 # In-memory rate limiting (use Redis in production)
 otp_request_counts = defaultdict(list)
+last_otp_sent = {}  # user_id -> timestamp
 
 
 def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
@@ -158,6 +159,15 @@ class OtpService:
                     'error': rate_limit.get('message', 'Rate limit exceeded')
                 }
 
+            # ── Check cooldown (60 seconds between OTP sends) ───────────────
+            now = datetime.utcnow().timestamp()
+            last_sent = last_otp_sent.get(user_id, 0)
+            if now - last_sent < 60:
+                remaining = int(60 - (now - last_sent))
+                return {
+                    'error': f'Please wait {remaining} seconds before requesting another OTP'
+                }
+
             # ── Check for lockout ───────────────────────────────────────────
             lockout_check = OtpService._check_lockout(db, user_id)
             if lockout_check:
@@ -201,6 +211,7 @@ class OtpService:
 
             # ── Record the request for rate limiting ───────────────────────
             OtpService.record_otp_request(user_id)
+            last_otp_sent[user_id] = now
 
             # ── Get user details for email ──────────────────────────────────
             user = db.query(User).filter(User.id == user_id).first()

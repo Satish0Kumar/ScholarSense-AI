@@ -28,7 +28,6 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table,
     TableStyle, HRFlowable, PageBreak
 )
-from reportlab.platypus import KeepTogether
 
 # Project imports
 from backend.database.db_config import SessionLocal
@@ -36,6 +35,7 @@ from backend.database.models import (
     Student, AcademicRecord, Attendance,
     RiskPrediction, Notification
 )
+from backend.config.settings import SCHOOL_NAME, ACADEMIC_YEAR
 from sqlalchemy import func
 
 # ── Colors ─────────────────────────────────────────────────────────────────────
@@ -292,7 +292,7 @@ class PDFService:
             elements += PDFService._build_header(
                 styles,
                 title    = 'Individual Student Academic Report',
-                subtitle = 'Greenwood High School • Academic Year 2025-26'
+                subtitle = f'{SCHOOL_NAME} • Academic Year {ACADEMIC_YEAR}'
             )
 
             # ── Student Info Section ────────────────────────────────────────
@@ -526,8 +526,6 @@ class PDFService:
                 risk_icon   = risk_icons.get(risk_label, '⚪')
                 # Stored as percentage 0–100 (see prediction_service)
                 _conf = float(prediction.confidence_score)
-                if _conf > 100:
-                    _conf /= 100
                 confidence = f"{_conf:.1f}%" if prediction.confidence_score else 'N/A'
                 pred_date   = prediction.created_at.strftime('%d %b %Y') \
                             if prediction.created_at else 'N/A'
@@ -565,7 +563,7 @@ class PDFService:
                 color=MED_GRAY, spaceAfter=6
             ))
             elements.append(Paragraph(
-                f"🏫 Greenwood High School  •  ScholarSense v2.0  •  "
+                f"🏫 {SCHOOL_NAME}  •  ScholarSense v2.0  •  "
                 f"Confidential — For Internal Use Only",
                 styles['small']
             ))
@@ -623,7 +621,7 @@ class PDFService:
             elements += PDFService._build_header(
                 styles,
                 title    = f'{title_str} Academic Performance Report',
-                subtitle = 'Greenwood High School • Academic Year 2025-26'
+                subtitle = f'{SCHOOL_NAME} • Academic Year {ACADEMIC_YEAR}'
             )
 
             # ── Summary stats ────────────────────────────────────────────────
@@ -644,7 +642,8 @@ class PDFService:
                 att = PDFService._get_attendance_stats(db, s.id, days=30)
 
                 gpa       = float(academic.current_gpa) if academic else 0.0
-                risk_label= prediction.risk_level if prediction else 'N/A'
+                _level_names = {0: 'Low', 1: 'Medium', 2: 'High', 3: 'Critical'}
+                risk_label= _level_names.get(prediction.risk_level, 'N/A') if prediction else 'N/A'
                 gpa_list.append(gpa)
 
                 if risk_label in risk_counts:
@@ -761,7 +760,7 @@ class PDFService:
         try:
             # 2=High, 3=Critical
             query = db.query(RiskPrediction).filter(
-                RiskPrediction.risk_level.in_(['High', 'Critical'])
+                RiskPrediction.risk_level.in_([2, 3])
             ).order_by(RiskPrediction.created_at.desc())
 
             predictions = query.all()
@@ -798,7 +797,7 @@ class PDFService:
             elements += PDFService._build_header(
                 styles,
                 title    = f'At-Risk Students Report — {grade_str}',
-                subtitle = 'Greenwood High School • Academic Year 2025-26'
+                subtitle = f'{SCHOOL_NAME} • Academic Year {ACADEMIC_YEAR}'
             )
 
             if not filtered:

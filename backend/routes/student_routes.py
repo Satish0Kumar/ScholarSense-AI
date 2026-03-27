@@ -137,7 +137,8 @@ def update_student(student_id):
 
         result = StudentService.update_student(student_id, data)
         if 'error' in result:
-            return jsonify(result), 404
+            status_code = 404 if 'not found' in result['error'].lower() else 400
+            return jsonify(result), status_code
 
         print(f"✅ Student updated: ID {student_id}")
         return jsonify(result), 200

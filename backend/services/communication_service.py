@@ -28,6 +28,10 @@ EMAIL_PASSWORD  = os.getenv('EMAIL_PASSWORD',  '')
 SENDER_NAME     = os.getenv('SENDER_NAME',     'ScholarSense')
 SENDER_EMAIL    = os.getenv('SENDER_EMAIL',    EMAIL_USER)
 
+# Validate email config
+if not EMAIL_USER or not EMAIL_PASSWORD:
+    print("⚠️ WARNING: Email credentials not configured — communications disabled")
+
 # ============================================
 # COMMUNICATION TYPES
 # ============================================
@@ -238,11 +242,9 @@ class CommunicationService:
             msg.attach(MIMEText(plain_body, 'plain'))
 
             # HTML version — convert basic markdown to HTML
-            html_body = body \
-                .replace('**', '<b>') \
-                .replace('**', '</b>') \
-                .replace('\n', '<br/>') \
-                .replace('- ', '&nbsp;&nbsp;• ')
+            import re
+            html_body = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', body)
+            html_body = html_body.replace('\n', '<br/>').replace('- ', '&nbsp;&nbsp;• ')
 
             html_full = f"""
             <html><body style="font-family:Arial,sans-serif;
@@ -311,12 +313,13 @@ class CommunicationService:
     def build_message(
         template_type: str,
         student:       object,
-        extra_data:    dict = {}
+        extra_data:    dict = None
     ) -> dict:
         """
         Build subject + body from template
         Returns: {"subject": "...", "body": "..."}
         """
+        extra_data = extra_data or {}
         template = TEMPLATES.get(template_type, TEMPLATES['Custom'])
 
         # Base variables
@@ -358,7 +361,7 @@ class CommunicationService:
         Returns:
             {"status": "success", "data": communication_dict}
         """
-        db = next(CommunicationService.get_db())
+        db = SessionLocal()
         try:
             # Validate required
             if 'student_id' not in data:
@@ -459,6 +462,8 @@ class CommunicationService:
             db.rollback()
             print(f"❌ Send communication error: {e}")
             return {"status": "error", "message": str(e)}
+        finally:
+            db.close()
 
     # ──────────────────────────────────────────
     # BATCH SEND (Send to multiple students)
@@ -468,13 +473,14 @@ class CommunicationService:
     def batch_send(
         student_ids:    list,
         comm_type:      str,
-        extra_data:     dict = {},
+        extra_data:     dict = None,
         sent_by:        int  = None
     ) -> dict:
         """
         Send same communication type to multiple students
         Returns: summary of sent/failed counts
         """
+        extra_data = extra_data or {}
         results  = []
         sent     = 0
         failed   = 0
@@ -515,12 +521,13 @@ class CommunicationService:
     # ──────────────────────────────────────────
 
     @staticmethod
-    def get_history(filters: dict = {}) -> dict:
+    def get_history(filters: dict = None) -> dict:
         """
         Get communication history with filters
         Filters: student_id, comm_type, status, limit, offset
         """
-        db = next(CommunicationService.get_db())
+        filters = filters or {}
+        db = SessionLocal()
         try:
             query = db.query(Communication).join(Student)
 
@@ -564,6 +571,8 @@ class CommunicationService:
         except Exception as e:
             print(f"❌ Get history error: {e}")
             return {"status": "error", "message": str(e)}
+        finally:
+            db.close()
 
     # ──────────────────────────────────────────
     # GET COMMUNICATION STATS
@@ -575,7 +584,7 @@ class CommunicationService:
         Get communication statistics for dashboard
         Returns: total sent, by type, by status, last 7 days
         """
-        db = next(CommunicationService.get_db())
+        db = SessionLocal()
         try:
             total = db.query(func.count(Communication.id)).scalar()
 
@@ -618,6 +627,8 @@ class CommunicationService:
         except Exception as e:
             print(f"❌ Comm stats error: {e}")
             return {"status": "error", "message": str(e)}
+        finally:
+            db.close()
 
     # ──────────────────────────────────────────
     # GET TEMPLATES (for frontend preview)
