@@ -4,9 +4,10 @@ ScholarSense - AI-Powered Academic Intelligence System
 """
 import bcrypt
 from datetime import datetime, timedelta
-from flask_jwt_extended import create_access_token, get_jwt_identity
+
 from backend.database.models import User
-from backend.database.db_config import get_db
+from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity
+from backend.database.db_config import get_db, SessionLocal
 
 class AuthService:
     """Handle user authentication and authorization"""
@@ -144,7 +145,7 @@ class AuthService:
         Called after OTP verification is complete.
         Returns: dict with access_token and user info
         """
-        db = SessionLocal()
+        db = next(get_db())
         try:
             user = db.query(User).filter(
                 User.id == user_id,
