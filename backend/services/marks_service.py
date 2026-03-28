@@ -242,16 +242,23 @@ class MarksService:
         always has up-to-date data for predictions
         """
         try:
+            semester_value = str(semester).strip()
             existing = db.query(AcademicRecord).filter(
                 and_(
                     AcademicRecord.student_id == student_id,
-                    AcademicRecord.semester   == semester
+                    AcademicRecord.semester   == semester_value
                 )
             ).first()
 
+            sem_num = MarksService._parse_semester_number(semester)
+            prev_semester_num = sem_num - 1 if sem_num > 1 else 1
+            if isinstance(semester, str) and semester.lower().startswith('semester'):
+                prev_semester = f"Semester {prev_semester_num}"
+            else:
+                prev_semester = str(prev_semester_num)
+
             if existing:
                 # Fetch previous semester's GPA for trend calculation
-                prev_semester = semester - 1 if semester > 1 else 1
                 prev_record = db.query(AcademicRecord).filter(
                     and_(
                         AcademicRecord.student_id == student_id,
@@ -275,7 +282,7 @@ class MarksService:
             else:
                 new_record = AcademicRecord(
                     student_id                 = student_id,
-                    semester                   = semester,
+                    semester                   = semester_value,
                     current_gpa                = gpa,
                     previous_gpa               = gpa,
                     grade_trend                = 0.0,  # No trend for first semester
@@ -296,6 +303,23 @@ class MarksService:
         except Exception as e:
             db.rollback()
             print(f"⚠️  Academic sync error (non-critical): {e}")
+
+    @staticmethod
+    def _parse_semester_number(semester):
+        if isinstance(semester, int):
+            return semester
+        if not semester:
+            return 1
+        text = str(semester).strip()
+        if text.lower().startswith('semester'):
+            parts = text.split()
+            if len(parts) >= 2 and parts[-1].isdigit():
+                return int(parts[-1])
+        if text.isdigit():
+            return int(text)
+        if text.lower() == 'annual':
+            return 3
+        return 1
 
     # ──────────────────────────────────────────
     # GET CLASS MARKS
@@ -578,7 +602,8 @@ class MarksService:
                 SELECT
                     AVG(math_score) as math, AVG(science_score) as science,
                     AVG(english_score) as english, AVG(social_score) as social,
-                    AVG(current_gpa) as gpa, COUNT(*) as total
+                    AVG(language_score) as language, AVG(current_gpa) as gpa,
+                    COUNT(*) as total
                 FROM academic_records ar
                 JOIN students s ON ar.student_id = s.id
                 WHERE s.grade = :grade AND s.is_active = true
@@ -589,7 +614,7 @@ class MarksService:
                 params['section'] = section
             result = db.execute(text(query), params)
             row = result.fetchone()
-            return dict(row) if row else {}
+            return dict(row._mapping) if row else {}
         finally:
             db.close()
 

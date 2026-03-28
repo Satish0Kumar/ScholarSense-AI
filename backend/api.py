@@ -34,6 +34,7 @@ from backend.services.prediction_service import PredictionService
 
 # ── Import blueprint registrar ─────────────────────────────────────────
 from backend.routes import register_blueprints
+from backend.auth.token_blocklist import is_token_revoked
 
 # ══════════════════════════════════════════════════════════════════════
 # APP INITIALIZATION
@@ -57,7 +58,13 @@ print(f"   Algorithm: {app.config['JWT_ALGORITHM']}\n")
 allowed_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:8501').split(',')
 CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 jwt = JWTManager(app)
+@jwt.token_in_blocklist_loader
+def check_if_token_revoked(jwt_header, jwt_payload):
+    return is_token_revoked(jwt_header, jwt_payload)
 
+@jwt.revoked_token_loader
+def revoked_token_callback(jwt_header, jwt_payload):
+    return jsonify({'error': 'Token has been revoked'}), 401
 # ── Register all route blueprints ──────────────────────────────────────
 register_blueprints(app)
 

@@ -1,11 +1,12 @@
 # backend/routes/auth_routes.py
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token, create_refresh_token, get_jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import time
 
 from backend.auth.auth_service import AuthService
+from backend.auth.token_blocklist import revoke_token
 from backend.services.otp_service import OtpService
 from backend.services.email_service import EmailService
 
@@ -140,8 +141,12 @@ def resend_otp():
 
         # Check cooldown - prevent spam resend
         last_otp = OtpService.get_latest_otp(user_id)
-        if last_otp and (datetime.utcnow() - last_otp.created_at).total_seconds() < 60:
-            return jsonify({'error': 'Please wait 60 seconds before requesting a new OTP'}), 429
+        if last_otp:
+            last_created = last_otp.created_at
+            if last_created.tzinfo is not None:
+                last_created = last_created.astimezone(timezone.utc).replace(tzinfo=None)
+            if (datetime.utcnow() - last_created).total_seconds() < 60:
+                return jsonify({'error': 'Please wait 60 seconds before requesting a new OTP'}), 429
 
         otp_data = OtpService.create_otp(user_id)
         if 'error' in otp_data:
@@ -193,6 +198,10 @@ def verify_token():
 def logout():
     try:
         user_id = get_jwt_identity()
+        claims = get_jwt()
+        jti = claims.get('jti')
+        if jti:
+            revoke_token(jti)
         print(f"User {user_id} logged out")
         return jsonify({'message': 'Logged out successfully'}), 200
     except Exception as e:

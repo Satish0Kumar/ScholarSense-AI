@@ -11,6 +11,7 @@ from datetime import datetime
 from backend.database.models import Student, AcademicRecord, RiskPrediction, Attendance, BehavioralIncident
 from backend.database.db_config import get_db
 from sqlalchemy import func, desc
+from backend.database.db_config import SessionLocal  # ← ADD THIS
 
 class PredictionService:
     """Handle ML-based risk predictions"""

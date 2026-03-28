@@ -20,6 +20,8 @@ INCIDENT_TYPES = [
     'Bullying',
     'Late Arrival',
     'Absence',
+    'Academic Misconduct',
+    'Property Damage',
     'Other'
 ]
 

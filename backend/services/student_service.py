@@ -236,6 +236,16 @@ class StudentService:
             return {'count': query.count()}
         finally:
             db.close()
+
+
+    @staticmethod
+    def get_all_students(grade=None, section=None):
+        """Alias for backward compatibility"""
+        students, _ = StudentService.get_all_students_paginated(
+            grade=grade, section=section, per_page=500
+        )
+        return students
+
     
     @staticmethod
     def get_student_with_records(student_id: int):
@@ -311,7 +321,7 @@ if __name__ == "__main__":
     
     # Test 2: Get all students
     print("\n2. Getting all students...")
-    students = StudentService.get_all_students()
+    students = StudentService.get_all_students_paginated()
     print(f"   ✅ Found {len(students)} students")
     
     # Test 3: Get students count

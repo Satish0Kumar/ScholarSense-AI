@@ -15,8 +15,8 @@ from backend.database.db_config import SessionLocal
 # CONSTANTS
 # ============================================
 INCIDENT_TYPES = [
-    'Disciplinary', 'Disruptive', 'Bullying', 
-    'Academic Misconduct', 'Attendance Issue', 
+    'Disciplinary', 'Disruptive', 'Bullying',
+    'Late Arrival', 'Absence', 'Academic Misconduct',
     'Property Damage', 'Other'
 ]
 
@@ -266,25 +266,32 @@ class BehavioralService:
         try:
             cutoff_date = date.today() - timedelta(days=days)
             
-            trends = db.query(
+            rows = db.query(
                 func.date(BehavioralIncident.incident_date).label('date'),
-                func.count().label('count'),
-                func.string_agg(BehavioralIncident.severity, ', ').label('severities')
+                BehavioralIncident.severity,
+                func.count().label('count')
             ).filter(
                 BehavioralIncident.incident_date >= cutoff_date
             ).group_by(
-                func.date(BehavioralIncident.incident_date)
+                func.date(BehavioralIncident.incident_date),
+                BehavioralIncident.severity
             ).order_by('date').all()
-            
-            trend_data = [
-                {
-                    'date': row.date.isoformat(),
-                    'count': row.count,
-                    'severities': row.severities.split(', ') if row.severities else []
-                }
-                for row in trends
-            ]
-            
+
+            trend_map = {}
+            for row in rows:
+                date_key = row.date.isoformat()
+                if date_key not in trend_map:
+                    trend_map[date_key] = {
+                        'date': date_key,
+                        'count': 0,
+                        'severities': []
+                    }
+                trend_map[date_key]['count'] += row.count
+                if row.severity not in trend_map[date_key]['severities']:
+                    trend_map[date_key]['severities'].append(row.severity)
+
+            trend_data = list(trend_map.values())
+
             return {
                 "status": "success",
                 "data": {

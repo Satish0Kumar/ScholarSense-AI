@@ -10,6 +10,7 @@ class APIClient:
     """Client for communicating with ScholarSense API"""
     
     BASE_URL = "http://localhost:5000/api"
+    DEFAULT_TIMEOUT = 15
     
     @staticmethod
     def get_headers(token: str = None) -> Dict:
@@ -23,6 +24,14 @@ class APIClient:
                 'Content-Type': 'application/json'
             }
         return {'Content-Type': 'application/json'}
+
+    @staticmethod
+    def _build_url(endpoint: str) -> str:
+        if not endpoint.startswith('/'):
+            endpoint = f"/{endpoint}"
+        if endpoint.startswith('/api/'):
+            endpoint = endpoint[4:]
+        return f"{APIClient.BASE_URL}{endpoint}"
     
     # ============================================
     # AUTHENTICATION
@@ -82,7 +91,7 @@ class APIClient:
     # ============================================
     
     @staticmethod
-    def get_students(grade: int = None, section: str = None, search: str = None) -> List[Dict]:
+    def get_students(grade: int = None, section: str = None, search: str = None, per_page: int = None) -> List[Dict]:
         """Get all students with optional filters"""
         try:
             params = {}
@@ -92,12 +101,14 @@ class APIClient:
                 params['section'] = section
             if search:
                 params['search'] = search
+            if per_page:
+                params['per_page'] = per_page
             
             response = requests.get(
-                f"{APIClient.BASE_URL}/students",
+                APIClient._build_url('/students'),
                 headers=APIClient.get_headers(),
                 params=params,
-                timeout=5
+                timeout=APIClient.DEFAULT_TIMEOUT
             )
             
             # AFTER ✅ (extract students list from paginated response)

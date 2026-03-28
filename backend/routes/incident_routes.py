@@ -1,6 +1,6 @@
 # backend/routes/incident_routes.py
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
 from backend.services.behavioral_service import BehavioralService as IncidentService
 
@@ -15,8 +15,7 @@ def log_incident():
         data = request.get_json()
         if not data:
             return jsonify({'error': 'No data provided'}), 400
-        claims      = get_jwt()
-        reporter_id = int(claims.get('user_id') or claims.get('sub') or 1)
+        reporter_id = get_jwt_identity()
         result      = IncidentService.log_incident(data, reporter_id=reporter_id)
         if result.get('status') == 'error':
             return jsonify(result), 400

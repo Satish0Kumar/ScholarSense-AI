@@ -107,7 +107,7 @@ else:
 # Make prediction section
 st.markdown('<p class="section-header">🎯 Make New Prediction</p>', unsafe_allow_html=True)
 
-students = APIClient.get_students()
+students = APIClient.get_students(per_page=500)
 if students:
     student_options = {f"{s['first_name']} {s['last_name']} ({s['student_id']})": s['id'] for s in students}
     
