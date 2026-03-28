@@ -117,7 +117,7 @@ class PredictionService:
             # Prepare features dictionary (matching your model's expected features)
             features = {
                 'student_id': student.student_id,
-                'age': student.age or 15,
+                'age': student.computed_age or 15,
                 'grade': student.grade,
                 'gender': student.gender,  # Will be encoded if needed
                 'socioeconomic_status': student.socioeconomic_status or 'Medium',
