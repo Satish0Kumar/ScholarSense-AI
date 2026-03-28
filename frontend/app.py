@@ -160,23 +160,12 @@ st.markdown("""
         margin-top: 12px;
     }
 
-    /* Footer */
-    .footer {
-        text-align: center;
-        color: #4a5568;
-        font-size: 0.9rem;
-        margin-top: 3rem;
-        padding: 1rem;
-    }
-    .footer-school {
-        font-weight: 600;
-        color: #2d3748;
-    }
-
-    /* Hide Streamlit branding */
+    /* Hide Streamlit branding and sidebar nav on login */
     #MainMenu { visibility: hidden; }
     footer    { visibility: hidden; }
     header    { visibility: hidden; }
+    [data-testid="stSidebarNav"] { display: none !important; }
+    [data-testid="stSidebar"]    { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -215,7 +204,7 @@ if st.session_state.login_step == 'credentials':
 
     email = st.text_input(
         "📧 Email Address",
-        placeholder = "admin@scholarsense.com",
+        placeholder = "Enter your email",
         key         = "login_email"
     )
 
@@ -238,7 +227,6 @@ if st.session_state.login_step == 'credentials':
             st.error("❌ Please enter both email and password")
         else:
             with st.spinner("Verifying credentials..."):
-                # Call modified login endpoint
                 response = APIClient.post(
                     '/api/auth/login',
                     {'email': email, 'password': password},
@@ -246,7 +234,6 @@ if st.session_state.login_step == 'credentials':
                 )
 
             if response.get('status') == 'otp_sent':
-                # ── Credentials valid → Move to OTP screen ──────────────────
                 st.session_state.login_step   = 'otp'
                 st.session_state.otp_user_id  = response.get('user_id')
                 st.session_state.otp_email    = response.get('email')
@@ -259,27 +246,6 @@ if st.session_state.login_step == 'credentials':
             else:
                 st.error("❌ Invalid credentials. Please try again.")
 
-    # ── Footer ─────────────────────────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("""
-    <div class="footer">
-        <p class="footer-school">🏫 Greenwood High School • Academic Year 2025-26</p>
-        <p style="margin-top:0.5rem;">Powered by AI • Built for Excellence</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ── Demo credentials ────────────────────────────────────────────────────────
-    with st.expander("🔑 Demo Credentials"):
-        st.markdown("""
-        **Admin Account:**
-        - Email: `admin@scholarsense.com`
-        - Password: `admin123`
-
-        **Teacher Account:**
-        - Email: `teacher@scholarsense.com`
-        - Password: `teacher123`
-        """)
-
 
 # ==============================================================================
 # SCREEN 2 — OTP VERIFICATION
@@ -290,7 +256,6 @@ elif st.session_state.login_step == 'otp':
     st.markdown('<div class="section-header">📱 Two-Factor Verification</div>',
                 unsafe_allow_html=True)
 
-    # ── OTP info box ────────────────────────────────────────────────────────────
     masked_email = st.session_state.otp_email or "your email"
     st.markdown(f"""
     <div class="otp-info-box">
@@ -301,7 +266,6 @@ elif st.session_state.login_step == 'otp':
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Timer notice ────────────────────────────────────────────────────────────
     st.markdown("""
     <div class="timer-badge">
         ⏱️ OTP expires in <strong>5 minutes</strong> •
@@ -309,7 +273,6 @@ elif st.session_state.login_step == 'otp':
     </div>
     """, unsafe_allow_html=True)
 
-    # ── OTP input ───────────────────────────────────────────────────────────────
     otp_input = st.text_input(
         "🔢 Enter 6-Digit OTP",
         placeholder = "e.g. 847392",
@@ -323,16 +286,13 @@ elif st.session_state.login_step == 'otp':
 
     st.write("")  # Spacer
 
-    # ── Action buttons ──────────────────────────────────────────────────────────
     col1, col2 = st.columns(2)
-
     with col1:
         verify_button = st.button(
             "✅ Verify OTP",
             type               = "primary",
             use_container_width = True
         )
-
     with col2:
         resend_button = st.button(
             "🔄 Resend OTP",
@@ -340,21 +300,17 @@ elif st.session_state.login_step == 'otp':
             use_container_width = True
         )
 
-    # ── Back to login ───────────────────────────────────────────────────────────
     st.write("")
     back_button = st.button(
         "← Back to Login",
         use_container_width = True
     )
 
-    # ── Handle Verify OTP ───────────────────────────────────────────────────────
     if verify_button:
         if not otp_input:
             st.error("❌ Please enter the OTP")
-
         elif len(otp_input) != 6 or not otp_input.isdigit():
             st.error("❌ OTP must be exactly 6 digits")
-
         else:
             with st.spinner("Verifying OTP..."):
                 response = APIClient.post(
@@ -367,45 +323,33 @@ elif st.session_state.login_step == 'otp':
                 )
 
             if 'access_token' in response:
-                # ── OTP Valid → Store token → Redirect ──────────────────────
                 SessionManager.set_session(
                     token = response['access_token'],
                     user  = response['user']
                 )
-
-                # Reset OTP state
                 st.session_state.login_step   = 'credentials'
                 st.session_state.otp_user_id  = None
                 st.session_state.otp_email    = None
                 st.session_state.otp_attempts = 0
-
                 st.success("✅ Login successful! Redirecting to dashboard...")
                 st.rerun()
 
             elif 'error' in response:
                 st.session_state.otp_attempts += 1
                 error_msg = response['error']
-
                 if 'locked' in error_msg.lower():
                     st.error(f"🔒 {error_msg}")
-                    st.warning(
-                        "Your account is temporarily locked. "
-                        "Please try again after 15 minutes."
-                    )
-                    # Reset to credentials screen after lockout
+                    st.warning("Your account is temporarily locked. Please try again after 15 minutes.")
                     st.session_state.login_step  = 'credentials'
                     st.session_state.otp_user_id = None
                     st.session_state.otp_email   = None
-
                 elif 'expired' in error_msg.lower():
                     st.error("⏰ OTP has expired!")
                     st.info("Click **Resend OTP** to get a new one.")
-
                 else:
                     remaining = (MAX_ATTEMPTS - st.session_state.otp_attempts)
                     st.error(f"❌ {error_msg}")
 
-    # ── Handle Resend OTP ───────────────────────────────────────────────────────
     if resend_button:
         with st.spinner("Sending new OTP..."):
             response = APIClient.post(
@@ -413,18 +357,13 @@ elif st.session_state.login_step == 'otp':
                 {'user_id': st.session_state.otp_user_id},
                 require_auth=False
             )
-
         if response.get('status') == 'otp_sent':
-            st.session_state.otp_attempts = 0  # Reset attempts on resend
-            st.success(
-                f"✅ New OTP sent to {response.get('email', masked_email)}"
-            )
+            st.session_state.otp_attempts = 0
+            st.success(f"✅ New OTP sent to {response.get('email', masked_email)}")
             st.info("⏱️ New OTP is valid for 5 minutes.")
-
         elif 'error' in response:
             st.error(f"❌ {response['error']}")
 
-    # ── Handle Back button ──────────────────────────────────────────────────────
     if back_button:
         st.session_state.login_step   = 'credentials'
         st.session_state.otp_user_id  = None
