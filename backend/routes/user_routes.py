@@ -84,20 +84,55 @@ def delete_user(user_id):
 def update_user_status(user_id):
     claims = get_jwt()
     if claims.get('role') != 'admin':
-        return jsonify({'message': 'Admin access required'}), 403
+        return jsonify({'error': 'Admin access required'}), 403
     data = request.get_json()
+    
+    db = None
     try:
         from backend.database.db_config import SessionLocal
         from backend.database.models import User
-        db   = SessionLocal()
+        from datetime import datetime
+        
+        db = SessionLocal()
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            db.close()
-            return jsonify({'message': 'User not found'}), 404
-        user.is_active = data.get('is_active', True)
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Update allowed fields
+        if 'is_active' in data:
+            user.is_active = bool(data['is_active'])
+        if 'full_name' in data:
+            user.full_name = str(data['full_name'])
+        if 'role' in data:
+            if data['role'] not in ['admin', 'teacher']:
+                return jsonify({'error': 'Invalid role. Must be admin or teacher'}), 400
+            user.role = str(data['role'])
+        
         db.commit()
-        db.close()
-        print(f"✅ User {user_id} status updated to {user.is_active}")
-        return jsonify({'message': 'User updated successfully'}), 200
+        db.refresh(user)
+        
+        result = {
+            'message': 'User updated successfully',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.full_name,
+                'role': user.role,
+                'is_active': user.is_active
+            }
+        }
+        
+        print(f"✅ User {user_id} updated successfully")
+        return jsonify(result), 200
+        
     except Exception as e:
-        return jsonify({'message': str(e)}), 500
+        if db:
+            db.rollback()
+        print(f"❌ Update user error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+    finally:
+        if db:
+            db.close()

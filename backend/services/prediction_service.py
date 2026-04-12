@@ -37,36 +37,36 @@ class PredictionService:
             if os.path.exists(cls.MODEL_PATH):
                 with open(cls.MODEL_PATH, 'rb') as f:
                     cls.model = pickle.load(f)
-                print(f"✅ ML Model loaded from {cls.MODEL_PATH}")
+                print(f"[OK] ML Model loaded from {cls.MODEL_PATH}")
             else:
-                print(f"⚠️  ML Model not found at {cls.MODEL_PATH}")
-                print(f"   Using dummy predictions")
+                print(f"[WARN] ML Model not found at {cls.MODEL_PATH}")
+                print("   Using dummy predictions")
                 return False
             
             # Load scaler (if exists)
             if os.path.exists(cls.SCALER_PATH):
                 with open(cls.SCALER_PATH, 'rb') as f:
                     cls.scaler = pickle.load(f)
-                print(f"✅ Scaler loaded from {cls.SCALER_PATH}")
+                print(f"[OK] Scaler loaded from {cls.SCALER_PATH}")
             
             # Load label encoders (if exists)
             if os.path.exists(cls.ENCODER_PATH):
                 with open(cls.ENCODER_PATH, 'rb') as f:
                     cls.label_encoders = pickle.load(f)
-                print(f"✅ Label encoders loaded from {cls.ENCODER_PATH}")
+                print(f"[OK] Label encoders loaded from {cls.ENCODER_PATH}")
             
             # Load metadata (if exists)
             if os.path.exists(cls.METADATA_PATH):
                 with open(cls.METADATA_PATH, 'rb') as f:
                     cls.metadata = pickle.load(f)
-                print(f"✅ Metadata loaded from {cls.METADATA_PATH}")
+                print(f"[OK] Metadata loaded from {cls.METADATA_PATH}")
                 if 'feature_names' in cls.metadata:
                     print(f"   Expected features: {cls.metadata['feature_names']}")
             
             return True
             
         except Exception as e:
-            print(f"❌ Error loading model: {e}")
+            print(f"[ERROR] Error loading model: {e}")
             return False
     
     @staticmethod
@@ -227,7 +227,7 @@ class PredictionService:
                     probabilities = [0.0, 0.0, 0.0, 0.0]
                     probabilities[risk_level] = 1.0
                 
-                print(f"🤖 ML Model Prediction: Risk Level {risk_level}")
+                print(f"[ML] Model Prediction: Risk Level {risk_level}")
                 
             else:
                 # Fallback to improved dummy prediction using multiple features
@@ -286,7 +286,7 @@ class PredictionService:
                 else:  # risk_level == 3
                     probabilities = [0.02, 0.05, 0.15, 0.78]
                 
-                print(f"⚠️  Dummy Prediction: Risk Level {risk_level} (GPA:{gpa:.1f}, Att:{attendance_rate:.0f}%, Fail:{failed_subjects})")
+                print(f"[DUMMY] Prediction: Risk Level {risk_level} (GPA:{gpa:.1f}, Att:{attendance_rate:.0f}%, Fail:{failed_subjects})")
             
             # Map risk level to label
             risk_labels = {0: 'Low', 1: 'Medium', 2: 'High', 3: 'Critical'}
@@ -329,7 +329,7 @@ class PredictionService:
             return prediction.to_dict()
         except Exception as e:
             db.rollback()
-            print(f"❌ Prediction error: {e}")
+            print(f"[ERROR] Prediction error: {e}")
             import traceback
             traceback.print_exc()
             return {'error': str(e)}
@@ -455,7 +455,7 @@ class PredictionService:
 try:
     PredictionService.load_model()
 except Exception as e:
-    print(f"⚠️  Warning: Could not load ML model on startup: {e}")
+    print(f"[WARN] Could not load ML model on startup: {e}")
     print("   This is normal if models/ directory is missing.")
     print("   Predictions will use dummy fallback values.")
 

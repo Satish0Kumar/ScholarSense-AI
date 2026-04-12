@@ -33,7 +33,7 @@ from reportlab.platypus import (
 from backend.database.db_config import SessionLocal
 from backend.database.models import (
     Student, AcademicRecord, Attendance,
-    RiskPrediction, Notification
+    RiskPrediction, Notification, BehavioralIncident
 )
 from backend.config.settings import SCHOOL_NAME, ACADEMIC_YEAR
 from sqlalchemy import func
@@ -741,6 +741,263 @@ class PDFService:
             elements.append(Paragraph(
                 f"🏫 {SCHOOL_NAME}  •  ScholarSense v2.0  •  "
                 f"Confidential — For Internal Use Only",
+                styles['small']
+            ))
+
+            doc.build(elements)
+            return buffer.getvalue()
+
+        finally:
+            db.close()
+
+    @staticmethod
+    def generate_academic_performance_alert(student_id: int) -> bytes:
+        """
+        Generate Academic Performance Alert PDF with:
+        - Progress report
+        - Risk assessment with factors
+        - Detailed suggestions for improvement
+        Returns: PDF as bytes
+        """
+        db = SessionLocal()
+        try:
+            # Fetch student data
+            student = db.query(Student).filter(Student.id == student_id).first()
+            if not student:
+                raise ValueError(f"Student {student_id} not found")
+
+            academic = db.query(AcademicRecord).filter(
+                AcademicRecord.student_id == student_id
+            ).order_by(AcademicRecord.recorded_date.desc()).first()
+
+            prediction = db.query(RiskPrediction).filter(
+                RiskPrediction.student_id == student_id
+            ).order_by(RiskPrediction.created_at.desc()).first()
+
+            att_stats = PDFService._get_attendance_stats(db, student_id)
+
+            # Get behavioral incidents
+            from datetime import timedelta
+            ninety_days_ago = date.today() - timedelta(days=90)
+            incident_count = db.query(func.count(BehavioralIncident.id)).filter(
+                BehavioralIncident.student_id == student_id,
+                BehavioralIncident.incident_date >= ninety_days_ago
+            ).scalar() or 0
+
+            # Build PDF
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(
+                buffer, pagesize=A4,
+                rightMargin=2*cm, leftMargin=2*cm,
+                topMargin=2*cm, bottomMargin=2*cm
+            )
+
+            styles = PDFService._get_styles()
+            elements = []
+
+            # Header
+            elements += PDFService._build_header(
+                styles,
+                title='Academic Performance Alert Report',
+                subtitle=f'{SCHOOL_NAME} • Academic Year {ACADEMIC_YEAR}'
+            )
+
+            # Student Info
+            student_name = f"{student.first_name} {student.last_name}"
+            elements.append(Paragraph('👤 Student Information', styles['section']))
+            elements.append(HRFlowable(width='100%', thickness=1, color=PRIMARY, spaceAfter=8))
+
+            info_data = [
+                ['Student Name', student_name, 'Grade', f"Grade {student.grade} - Section {student.section}"],
+                ['Student ID', student.student_id or 'N/A', 'Parent', student.parent_name or 'N/A'],
+                ['Parent Email', student.parent_email or 'N/A', 'Parent Phone', student.parent_phone or 'N/A']
+            ]
+            info_table = Table(info_data, colWidths=[4*cm, 4.5*cm, 4*cm, 4.5*cm])
+            info_table.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (0,-1), LIGHT_BLUE),
+                ('BACKGROUND', (2,0), (2,-1), LIGHT_BLUE),
+                ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+                ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0,0), (-1,-1), 9),
+                ('TEXTCOLOR', (0,0), (0,-1), PRIMARY),
+                ('TEXTCOLOR', (2,0), (2,-1), PRIMARY),
+                ('GRID', (0,0), (-1,-1), 0.5, MED_GRAY),
+                ('ROWBACKGROUNDS', (0,0), (-1,-1), [WHITE, LIGHT_GRAY]),
+                ('PADDING', (0,0), (-1,-1), 8),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ]))
+            elements.append(info_table)
+            elements.append(Spacer(1, 0.4*cm))
+
+            # Risk Assessment Section
+            elements.append(Paragraph('🚨 Risk Assessment', styles['section']))
+            elements.append(HRFlowable(width='100%', thickness=1, color=PRIMARY, spaceAfter=8))
+
+            if prediction:
+                _level_names = {0: 'Low', 1: 'Medium', 2: 'High', 3: 'Critical'}
+                risk_label = (prediction.risk_label or '').strip() or _level_names.get(
+                    int(prediction.risk_level) if prediction.risk_level is not None else 0, 'Low'
+                )
+                risk_color = RISK_COLORS.get(risk_label, TEXT_GRAY)
+                risk_bg = RISK_BG_COLORS.get(risk_label, LIGHT_GRAY)
+                risk_icons = {'Low':'🟢', 'Medium':'🟡', 'High':'🟠', 'Critical':'🔴'}
+                risk_icon = risk_icons.get(risk_label, '⚪')
+                confidence = f"{float(prediction.confidence_score):.1f}%"
+
+                risk_data = [
+                    ['Current Risk Level', 'Confidence Score', 'Assessment Date'],
+                    [f"{risk_icon} {risk_label}", confidence,
+                     prediction.created_at.strftime('%d %b %Y') if prediction.created_at else 'N/A']
+                ]
+                risk_table = Table(risk_data, colWidths=[5.67*cm]*3)
+                risk_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), PRIMARY),
+                    ('TEXTCOLOR', (0,0), (-1,0), WHITE),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('FONTNAME', (0,1), (-1,1), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0,0), (-1,-1), 11),
+                    ('TEXTCOLOR', (0,1), (0,1), risk_color),
+                    ('BACKGROUND', (0,1), (0,1), risk_bg),
+                    ('GRID', (0,0), (-1,-1), 0.5, MED_GRAY),
+                    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                    ('PADDING', (0,0), (-1,-1), 12),
+                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ]))
+                elements.append(risk_table)
+            else:
+                elements.append(Paragraph('⚠️ No risk assessment available.', styles['body']))
+
+            elements.append(Spacer(1, 0.4*cm))
+
+            # Risk Factors Analysis
+            elements.append(Paragraph('📊 Risk Factors Analysis', styles['section']))
+            elements.append(HRFlowable(width='100%', thickness=1, color=PRIMARY, spaceAfter=8))
+
+            factors = []
+            if academic:
+                gpa = float(academic.current_gpa) if academic.current_gpa else 0
+                if gpa < 50:
+                    factors.append(['🔴 Critical GPA', f'{gpa:.1f}%', 'GPA below 50% indicates severe academic difficulty'])
+                elif gpa < 65:
+                    factors.append(['🟠 Low GPA', f'{gpa:.1f}%', 'GPA below 65% requires immediate attention'])
+
+                if academic.grade_trend and float(academic.grade_trend) < -5:
+                    factors.append(['📉 Declining Grades', f'{float(academic.grade_trend):+.1f}%', 'Significant downward trend in performance'])
+
+                if academic.failed_subjects and academic.failed_subjects > 0:
+                    factors.append(['❌ Failed Subjects', str(academic.failed_subjects), 'Subject failures impact overall performance'])
+
+                if academic.assignment_submission_rate and float(academic.assignment_submission_rate) < 70:
+                    factors.append(['📝 Low Submission Rate', f'{float(academic.assignment_submission_rate):.1f}%', 'Poor assignment completion indicates disengagement'])
+
+            if att_stats['rate'] < 75:
+                factors.append(['📅 Low Attendance', f"{att_stats['rate']:.1f}%", 'Attendance below 75% is a major risk factor'])
+
+            if incident_count > 0:
+                factors.append(['⚠️ Behavioral Issues', str(incident_count), 'Behavioral incidents in last 90 days'])
+
+            if factors:
+                factor_data = [['Risk Factor', 'Value', 'Impact']]
+                factor_data.extend(factors)
+                factor_table = Table(factor_data, colWidths=[5*cm, 3*cm, 9*cm])
+                factor_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), DANGER),
+                    ('TEXTCOLOR', (0,0), (-1,0), WHITE),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0,0), (-1,-1), 9),
+                    ('GRID', (0,0), (-1,-1), 0.5, MED_GRAY),
+                    ('ROWBACKGROUNDS', (0,1), (-1,-1), [WHITE, LIGHT_GRAY]),
+                    ('PADDING', (0,0), (-1,-1), 8),
+                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ]))
+                elements.append(factor_table)
+            else:
+                elements.append(Paragraph('✅ No significant risk factors identified.', styles['body']))
+
+            elements.append(Spacer(1, 0.4*cm))
+
+            # Academic Performance Details
+            elements.append(Paragraph('📚 Academic Performance Details', styles['section']))
+            elements.append(HRFlowable(width='100%', thickness=1, color=PRIMARY, spaceAfter=8))
+
+            if academic:
+                perf_data = [
+                    ['Metric', 'Current', 'Previous', 'Status'],
+                    ['Overall GPA', f"{float(academic.current_gpa):.1f}%",
+                     f"{float(academic.previous_gpa):.1f}%" if academic.previous_gpa else 'N/A',
+                     '📈' if academic.grade_trend and float(academic.grade_trend) > 0 else '📉'],
+                    ['Mathematics', f"{float(academic.math_score):.1f}%" if academic.math_score else 'N/A', '', ''],
+                    ['Science', f"{float(academic.science_score):.1f}%" if academic.science_score else 'N/A', '', ''],
+                    ['English', f"{float(academic.english_score):.1f}%" if academic.english_score else 'N/A', '', ''],
+                    ['Social Studies', f"{float(academic.social_score):.1f}%" if academic.social_score else 'N/A', '', ''],
+                    ['Language', f"{float(academic.language_score):.1f}%" if academic.language_score else 'N/A', '', '']
+                ]
+                perf_table = Table(perf_data, colWidths=[5*cm, 4*cm, 4*cm, 4*cm])
+                perf_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), PRIMARY),
+                    ('TEXTCOLOR', (0,0), (-1,0), WHITE),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0,0), (-1,-1), 9),
+                    ('GRID', (0,0), (-1,-1), 0.5, MED_GRAY),
+                    ('ROWBACKGROUNDS', (0,1), (-1,-1), [WHITE, LIGHT_GRAY]),
+                    ('ALIGN', (1,0), (-1,-1), 'CENTER'),
+                    ('PADDING', (0,0), (-1,-1), 8),
+                ]))
+                elements.append(perf_table)
+
+            elements.append(Spacer(1, 0.4*cm))
+
+            # Recommendations & Suggestions
+            elements.append(Paragraph('💡 Recommendations & Action Plan', styles['section']))
+            elements.append(HRFlowable(width='100%', thickness=1, color=PRIMARY, spaceAfter=8))
+
+            suggestions = []
+            if academic and float(academic.current_gpa) < 65:
+                suggestions.append('• Schedule immediate parent-teacher meeting to discuss academic intervention')
+                suggestions.append('• Enroll student in remedial classes for weak subjects')
+                suggestions.append('• Assign peer tutor or mentor for additional support')
+
+            if att_stats['rate'] < 75:
+                suggestions.append('• Address attendance issues - investigate reasons for absences')
+                suggestions.append('• Implement attendance monitoring and parent notification system')
+
+            if academic and academic.failed_subjects and academic.failed_subjects > 0:
+                suggestions.append('• Provide extra coaching for failed subjects')
+                suggestions.append('• Consider re-examination or supplementary assessment opportunities')
+
+            if incident_count > 0:
+                suggestions.append('• Counseling sessions to address behavioral concerns')
+                suggestions.append('• Involve school counselor and parents in behavior improvement plan')
+
+            if academic and academic.assignment_submission_rate and float(academic.assignment_submission_rate) < 70:
+                suggestions.append('• Monitor assignment completion closely')
+                suggestions.append('• Provide study skills training and time management guidance')
+
+            suggestions.append('• Regular progress monitoring and follow-up meetings')
+            suggestions.append('• Set achievable short-term goals with student and parents')
+
+            for suggestion in suggestions:
+                elements.append(Paragraph(suggestion, styles['body']))
+
+            elements.append(Spacer(1, 0.4*cm))
+
+            # Parent Action Required
+            elements.append(Paragraph('📞 Parent Action Required', styles['section']))
+            elements.append(HRFlowable(width='100%', thickness=1, color=PRIMARY, spaceAfter=8))
+            elements.append(Paragraph(
+                'Dear Parent/Guardian, this report requires your immediate attention. '
+                'Please contact the school within 3 working days to schedule a meeting '
+                'with the class teacher and academic coordinator. Early intervention is '
+                'crucial for your child\'s academic success.',
+                styles['body']
+            ))
+
+            # Footer
+            elements.append(Spacer(1, 0.5*cm))
+            elements.append(HRFlowable(width='100%', thickness=0.5, color=MED_GRAY, spaceAfter=6))
+            elements.append(Paragraph(
+                f"🏫 {SCHOOL_NAME}  •  ScholarSense v2.0  •  "
+                f"Confidential — For Parent/Guardian Use Only",
                 styles['small']
             ))
 

@@ -119,7 +119,7 @@ def print_startup_message():
     print("\n" + "=" * 70)
     print("🎓 SCHOLARSENSE - AI-POWERED ACADEMIC INTELLIGENCE SYSTEM")
     print("=" * 70)
-    print(f"📡 API Server     : http://localhost:5000")
+    print(f"📡 API Server     : http://localhost:5001")
     print(f"🔐 Authentication : JWT ({app.config['JWT_ACCESS_TOKEN_EXPIRES']}s tokens)")
     print(f"💾 Database       : PostgreSQL")
     print(f"🌐 CORS           : Enabled")
@@ -138,7 +138,7 @@ if __name__ == '__main__':
         print("✅ Database connected - Starting server...")
         print_startup_message()
         debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-        app.run(debug=debug_mode, host='0.0.0.0', port=5000)
+        app.run(debug=debug_mode, host='0.0.0.0', port=5001)
     else:
         print("❌ Database connection failed!")
         sys.exit(1)

@@ -22,7 +22,7 @@ class User(Base):
     full_name = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False)  # 'admin' or 'teacher'
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)  # callable, evaluated per-row
     last_login = Column(DateTime)
     
     # Relationships
@@ -69,7 +69,7 @@ class Student(Base):
     parent_email = Column(String(255))
     socioeconomic_status = Column(String(20))
     parent_education = Column(String(50))
-    enrollment_date = Column(Date, default=datetime.utcnow().date())
+    enrollment_date = Column(Date, default=lambda: datetime.utcnow().date())
     is_active = Column(Boolean, default=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -95,6 +95,11 @@ class Student(Base):
                 (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
             )
         return None  # No fallback
+
+    @property
+    def age(self):
+        """Alias for computed_age for backward compatibility."""
+        return self.computed_age
     
     def __repr__(self):
         return f"<Student(id={self.id}, student_id='{self.student_id}', name='{self.full_name}')>"
@@ -142,7 +147,7 @@ class AcademicRecord(Base):
     english_score = Column(DECIMAL(5, 2))
     social_score = Column(DECIMAL(5, 2))
     language_score = Column(DECIMAL(5, 2))
-    recorded_date = Column(Date, default=datetime.utcnow().date())
+    recorded_date = Column(Date, default=lambda: datetime.utcnow().date())
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -183,8 +188,8 @@ class Attendance(Base):
     status = Column(String(20), nullable=False)
     remarks = Column(Text)  # ← ADD THIS IF MISSING
     marked_by = Column(Integer, ForeignKey('users.id'))
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     student = relationship("Student", back_populates="attendance_records")

@@ -30,40 +30,23 @@ class AuthService:
     @staticmethod
     def login(email: str, password: str):
         """
-        Authenticate user and return JWT token
-        Returns: dict with token and user info, or None if auth fails
+        Validate credentials only. Does NOT return a JWT token.
+        Token issuance happens in generate_token_for_user() after OTP verification.
+        Returns: dict with 'user' key on success, or None on failure.
         """
         db = next(get_db())
         try:
-            # Find user by email
             user = db.query(User).filter(User.email == email, User.is_active == True).first()
-            
+
             if not user:
                 return None
-            
-            # Verify password
+
             if not AuthService.verify_password(password, user.password_hash):
                 return None
-            
-            # Update last login
-            user.last_login = datetime.utcnow()
-            db.commit()
-            
-            # Create JWT token
-            access_token = create_access_token(
-                identity=str(user.id),
-                additional_claims={
-                    'role': user.role,
-                    'email': user.email,
-                    'name': user.full_name
-                },
-                expires_delta=timedelta(hours=8)
-            )
-            
-            return {
-                'access_token': access_token,
-                'user': user.to_dict()
-            }
+
+            # NOTE: Do NOT generate a JWT here — OTP must be verified first.
+            # Token is issued by generate_token_for_user() after OTP passes.
+            return {'user': user.to_dict()}
         except Exception as e:
             print(f"Login error: {e}")
             return None

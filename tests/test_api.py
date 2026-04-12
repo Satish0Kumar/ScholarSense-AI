@@ -1,285 +1,290 @@
 """
-API Testing Script
-Tests all endpoints of the Risk Detection API
+API Test Suite - ScholarSense
+Tests current API endpoints: auth, students, academics, predictions.
 """
 import requests
 import json
-import sys
 
-API_BASE_URL = "http://127.0.0.1:5000"
+API_BASE = "http://127.0.0.1:5000"
+
+# ── Shared state ───────────────────────────────────────────────────────────────
+_token = None
+_student_id = None
+_academic_id = None
 
 
 def print_section(title):
-    """Print section header"""
-    print("\n" + "="*70)
-    print(f"  {title}")
-    print("="*70)
+    print(f"\n{'='*65}\n  {title}\n{'='*65}")
 
+
+def req(method, path, data=None, auth=True):
+    headers = {"Content-Type": "application/json"}
+    if auth and _token:
+        headers["Authorization"] = f"Bearer {_token}"
+    url = f"{API_BASE}{path}"
+    try:
+        if method == "GET":
+            return requests.get(url, headers=headers, timeout=5)
+        if method == "POST":
+            return requests.post(url, json=data, headers=headers, timeout=5)
+        if method == "PUT":
+            return requests.put(url, json=data, headers=headers, timeout=5)
+        if method == "DELETE":
+            return requests.delete(url, headers=headers, timeout=5)
+    except requests.exceptions.ConnectionError:
+        return None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 1. HEALTH
+# ══════════════════════════════════════════════════════════════════════════════
 
 def test_health():
-    """Test health check endpoint"""
-    print_section("TEST 1: Health Check")
-    
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/health", timeout=5)
-        print(f"Status Code: {response.status_code}")
-        print(f"Response:\n{json.dumps(response.json(), indent=2)}")
-        
-        if response.status_code == 200:
-            print("✓ Health check passed!")
-            return True
-    except Exception as e:
-        print(f"❌ Health check failed: {str(e)}")
-        return False
+    print_section("1. Health Check")
+    r = req("GET", "/api/health", auth=False)
+    assert r and r.status_code == 200, f"Expected 200, got {r and r.status_code}"
+    assert r.json().get("status") == "healthy"
+    print("✓ /api/health → healthy")
 
 
-def test_model_info():
-    """Test model info endpoint"""
-    print_section("TEST 2: Model Information")
-    
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/risk/model-info", timeout=5)
-        print(f"Status Code: {response.status_code}")
-        print(f"Response:\n{json.dumps(response.json(), indent=2)}")
-        
-        if response.status_code == 200:
-            print("✓ Model info retrieved successfully!")
-            return True
-    except Exception as e:
-        print(f"❌ Model info failed: {str(e)}")
-        return False
+# ══════════════════════════════════════════════════════════════════════════════
+# 2. AUTH — credential validation only (OTP flow tested in test_integration.py)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_login_bad_credentials():
+    print_section("2. Auth — Bad Credentials Rejected")
+    r = req("POST", "/api/auth/login",
+            {"email": "nobody@example.com", "password": "wrong"},
+            auth=False)
+    assert r and r.status_code == 401, f"Expected 401, got {r and r.status_code}"
+    print("✓ Invalid credentials → 401")
 
 
-def test_single_prediction_low_risk():
-    """Test single prediction - Low Risk student"""
-    print_section("TEST 3: Single Prediction (Low Risk Student)")
-    
-    student_data = {
-        "age": 15,
-        "gender": "Female",
-        "grade": 10,
-        "socioeconomic_status": "High",
-        "parent_education": "Post-Graduate",
-        "current_gpa": 88.0,
-        "previous_gpa": 85.0,
-        "attendance_percentage": 95.0,
-        "failed_subjects": 0,
-        "assignment_submission_rate": 98.0,
-        "disciplinary_incidents": 0,
-        "counseling_visits": 0,
-        "consecutive_absences": 0,
-        "late_arrivals": 0,
-        "library_visits": 8,
-        "extracurricular_participation": 1
-    }
-    
-    print("\nInput Data:")
-    print(json.dumps(student_data, indent=2))
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=student_data,
-            headers={'Content-Type': 'application/json'},
-            timeout=5
-        )
-        
-        print(f"\nStatus Code: {response.status_code}")
-        print(f"Prediction Result:")
-        result = response.json()
-        print(json.dumps(result, indent=2))
-        
-        if response.status_code == 200 and result.get('success'):
-            print(f"\n✓ Prediction: {result['prediction']}")
-            print(f"✓ Confidence: {result['confidence']:.1f}%")
-            return True
-    except Exception as e:
-        print(f"❌ Single prediction failed: {str(e)}")
-        return False
+def test_login_missing_fields():
+    print_section("3. Auth — Missing Fields Rejected")
+    r = req("POST", "/api/auth/login", {"email": "admin@scholarsense.com"}, auth=False)
+    assert r and r.status_code == 400, f"Expected 400, got {r and r.status_code}"
+    print("✓ Missing password → 400")
 
 
-def test_single_prediction_critical_risk():
-    """Test single prediction - Critical Risk student"""
-    print_section("TEST 4: Single Prediction (Critical Risk Student)")
-    
-    student_data = {
-        "age": 16,
+def test_protected_without_token():
+    print_section("4. Auth — Protected Route Without Token")
+    r = requests.get(f"{API_BASE}/api/students", timeout=5)
+    assert r.status_code == 401, f"Expected 401, got {r.status_code}"
+    print("✓ /api/students without token → 401")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NOTE: Tests below require a valid JWT token.
+# Set _token manually or run after a successful OTP login.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def set_token(token: str):
+    global _token
+    _token = token
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 3. STUDENTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_create_student():
+    global _student_id
+    print_section("5. Students — Create")
+    if not _token:
+        print("⚠  Skipped (no token)")
+        return
+    payload = {
+        "student_id": "TEST_API_001",
+        "first_name": "ApiTest",
+        "last_name": "Student",
+        "grade": 8,
+        "section": "A",
         "gender": "Male",
-        "grade": 10,
-        "socioeconomic_status": "Low",
-        "parent_education": "High School",
-        "current_gpa": 45.0,
-        "previous_gpa": 50.0,
-        "attendance_percentage": 65.0,
-        "failed_subjects": 3,
-        "assignment_submission_rate": 55.0,
-        "disciplinary_incidents": 4,
-        "counseling_visits": 2,
-        "consecutive_absences": 5,
-        "late_arrivals": 8,
-        "library_visits": 1,
-        "extracurricular_participation": 0
+        "date_of_birth": "2010-06-15",
+        "socioeconomic_status": "Medium",
+        "parent_education": "Graduate"
     }
-    
-    print("\nInput Data:")
-    print(json.dumps(student_data, indent=2))
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=student_data,
-            headers={'Content-Type': 'application/json'},
-            timeout=5
-        )
-        
-        print(f"\nStatus Code: {response.status_code}")
-        print(f"Prediction Result:")
-        result = response.json()
-        print(json.dumps(result, indent=2))
-        
-        if response.status_code == 200 and result.get('success'):
-            print(f"\n✓ Prediction: {result['prediction']}")
-            print(f"✓ Confidence: {result['confidence']:.1f}%")
-            return True
-    except Exception as e:
-        print(f"❌ Single prediction failed: {str(e)}")
-        return False
+    r = req("POST", "/api/students", payload)
+    assert r and r.status_code in (200, 201), f"Expected 200/201, got {r and r.status_code}"
+    _student_id = r.json().get("id")
+    assert _student_id, "No student id in response"
+    print(f"✓ Student created → id={_student_id}")
 
 
-def test_batch_prediction():
-    """Test batch prediction"""
-    print_section("TEST 5: Batch Prediction (2 Students)")
-    
-    batch_data = {
-        "students": [
-            {
-                "student_id": "STU001",
-                "age": 16,
-                "gender": "Male",
-                "grade": 10,
-                "socioeconomic_status": "Low",
-                "parent_education": "High School",
-                "current_gpa": 45.0,
-                "previous_gpa": 50.0,
-                "attendance_percentage": 65.0,
-                "failed_subjects": 3,
-                "assignment_submission_rate": 55.0,
-                "disciplinary_incidents": 4
-            },
-            {
-                "student_id": "STU002",
-                "age": 15,
-                "gender": "Female",
-                "grade": 10,
-                "socioeconomic_status": "High",
-                "parent_education": "Post-Graduate",
-                "current_gpa": 88.0,
-                "previous_gpa": 85.0,
-                "attendance_percentage": 95.0,
-                "failed_subjects": 0,
-                "assignment_submission_rate": 98.0,
-                "disciplinary_incidents": 0
-            }
-        ]
+def test_get_students():
+    print_section("6. Students — List")
+    if not _token:
+        print("⚠  Skipped (no token)")
+        return
+    r = req("GET", "/api/students")
+    assert r and r.status_code == 200
+    assert isinstance(r.json(), list)
+    print(f"✓ /api/students → {len(r.json())} students")
+
+
+def test_get_student_by_id():
+    print_section("7. Students — Get By ID")
+    if not _token or not _student_id:
+        print("⚠  Skipped (no token or student)")
+        return
+    r = req("GET", f"/api/students/{_student_id}")
+    assert r and r.status_code == 200
+    assert r.json().get("id") == _student_id
+    print(f"✓ /api/students/{_student_id} → OK")
+
+
+def test_get_student_not_found():
+    print_section("8. Students — 404 For Unknown ID")
+    if not _token:
+        print("⚠  Skipped (no token)")
+        return
+    r = req("GET", "/api/students/999999")
+    assert r and r.status_code == 404, f"Expected 404, got {r and r.status_code}"
+    print("✓ /api/students/999999 → 404")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. ACADEMIC RECORDS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_create_academic_record():
+    global _academic_id
+    print_section("9. Academics — Create Record")
+    if not _token or not _student_id:
+        print("⚠  Skipped (no token or student)")
+        return
+    payload = {
+        "student_id": _student_id,
+        "semester": "2025-S1",
+        "current_gpa": 72.5,
+        "previous_gpa": 68.0,
+        "grade_trend": 4.5,
+        "failed_subjects": 0,
+        "total_subjects": 5,
+        "assignment_submission_rate": 88.0,
+        "math_score": 75.0,
+        "science_score": 70.0,
+        "english_score": 74.0,
+        "social_score": 71.0,
+        "language_score": 72.0
     }
-    
-    print(f"\nPredicting for {len(batch_data['students'])} students...")
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict-batch",
-            json=batch_data,
-            headers={'Content-Type': 'application/json'},
-            timeout=10
-        )
-        
-        print(f"\nStatus Code: {response.status_code}")
-        print(f"Batch Prediction Results:")
-        result = response.json()
-        print(json.dumps(result, indent=2))
-        
-        if response.status_code == 200 and result.get('success'):
-            print(f"\n✓ Processed {result['successful_predictions']} students successfully")
-            return True
-    except Exception as e:
-        print(f"❌ Batch prediction failed: {str(e)}")
-        return False
+    r = req("POST", "/api/academics", payload)
+    assert r and r.status_code in (200, 201), f"Expected 200/201, got {r and r.status_code}"
+    _academic_id = r.json().get("id")
+    print(f"✓ Academic record created → id={_academic_id}")
 
 
-def test_invalid_input():
-    """Test with invalid input"""
-    print_section("TEST 6: Invalid Input Validation")
-    
-    invalid_data = {
-        "age": 16,
-        "gender": "InvalidGender",  # Invalid
-        "grade": 10,
-        "current_gpa": 150  # Invalid (> 100)
-    }
-    
-    print("\nSending invalid data (should fail validation):")
-    print(json.dumps(invalid_data, indent=2))
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=invalid_data,
-            headers={'Content-Type': 'application/json'},
-            timeout=5
-        )
-        
-        print(f"\nStatus Code: {response.status_code}")
-        print(f"Response:\n{json.dumps(response.json(), indent=2)}")
-        
-        if response.status_code == 400:
-            print("✓ Validation correctly rejected invalid input!")
-            return True
-    except Exception as e:
-        print(f"❌ Invalid input test failed: {str(e)}")
-        return False
+def test_get_student_academics():
+    print_section("10. Academics — Get For Student")
+    if not _token or not _student_id:
+        print("⚠  Skipped (no token or student)")
+        return
+    r = req("GET", f"/api/students/{_student_id}/academics")
+    assert r and r.status_code == 200
+    print(f"✓ /api/students/{_student_id}/academics → OK")
 
 
-def run_all_tests():
-    """Run all API tests"""
-    print("\n" + "="*70)
-    print("  API TESTING SUITE - RISK DETECTION MODULE")
-    print("="*70)
-    print("\nMake sure the API server is running:")
-    print("  python backend/api.py")
-    print("\nPress Enter to start testing...")
-    input()
-    
-    results = []
-    
-    # Run tests
-    results.append(("Health Check", test_health()))
-    results.append(("Model Info", test_model_info()))
-    results.append(("Single Prediction (Low Risk)", test_single_prediction_low_risk()))
-    results.append(("Single Prediction (Critical Risk)", test_single_prediction_critical_risk()))
-    results.append(("Batch Prediction", test_batch_prediction()))
-    results.append(("Invalid Input", test_invalid_input()))
-    
-    # Summary
-    print_section("TEST SUMMARY")
-    passed = sum(1 for _, result in results if result)
-    total = len(results)
-    
-    for test_name, result in results:
-        status = "✓ PASSED" if result else "❌ FAILED"
-        print(f"{status}: {test_name}")
-    
-    print(f"\nTotal: {passed}/{total} tests passed")
-    
-    if passed == total:
-        print("\n🎉 ALL TESTS PASSED! API is working correctly!")
-    else:
-        print(f"\n⚠️ {total - passed} test(s) failed. Check the output above.")
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. PREDICTIONS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_make_prediction():
+    print_section("11. Predictions — Make Prediction")
+    if not _token or not _student_id:
+        print("⚠  Skipped (no token or student)")
+        return
+    r = req("POST", f"/api/students/{_student_id}/predict", {})
+    assert r and r.status_code == 200, f"Expected 200, got {r and r.status_code}"
+    data = r.json()
+    assert "risk_label" in data, f"No risk_label in response: {data}"
+    assert data["risk_label"] in ("Low", "Medium", "High", "Critical")
+    assert 0 <= data.get("confidence_score", -1) <= 100
+    print(f"✓ Prediction → {data['risk_label']} ({data['confidence_score']:.1f}%)")
+
+
+def test_get_prediction_history():
+    print_section("12. Predictions — History")
+    if not _token or not _student_id:
+        print("⚠  Skipped (no token or student)")
+        return
+    r = req("GET", f"/api/students/{_student_id}/predictions")
+    assert r and r.status_code == 200
+    assert isinstance(r.json(), list)
+    print(f"✓ Prediction history → {len(r.json())} records")
+
+
+def test_high_risk_endpoint():
+    print_section("13. Predictions — High-Risk List")
+    if not _token:
+        print("⚠  Skipped (no token)")
+        return
+    r = req("GET", "/api/predictions/high-risk")
+    assert r and r.status_code == 200
+    assert isinstance(r.json(), list)
+    print(f"✓ /api/predictions/high-risk → {len(r.json())} students")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. CLEANUP
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_delete_student():
+    print_section("14. Students — Delete (cleanup)")
+    if not _token or not _student_id:
+        print("⚠  Skipped (no token or student)")
+        return
+    r = req("DELETE", f"/api/students/{_student_id}")
+    assert r and r.status_code in (200, 204), f"Expected 200/204, got {r and r.status_code}"
+    print(f"✓ Student {_student_id} deleted")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RUNNER
+# ══════════════════════════════════════════════════════════════════════════════
+
+def run_all():
+    print("\n" + "="*65)
+    print("  SCHOLARSENSE — API TEST SUITE")
+    print("="*65)
+    print("Ensure backend is running: python backend/api.py")
+    print("\nNote: Tests 5-14 require a valid JWT token.")
+    print("      Call set_token('<your_token>') before running,")
+    print("      or complete OTP login and paste the token.\n")
+
+    passed, failed = 0, 0
+    tests = [
+        test_health,
+        test_login_bad_credentials,
+        test_login_missing_fields,
+        test_protected_without_token,
+        test_create_student,
+        test_get_students,
+        test_get_student_by_id,
+        test_get_student_not_found,
+        test_create_academic_record,
+        test_get_student_academics,
+        test_make_prediction,
+        test_get_prediction_history,
+        test_high_risk_endpoint,
+        test_delete_student,
+    ]
+
+    for t in tests:
+        try:
+            t()
+            passed += 1
+        except AssertionError as e:
+            print(f"✗ FAILED: {t.__name__} — {e}")
+            failed += 1
+        except Exception as e:
+            print(f"✗ ERROR:  {t.__name__} — {e}")
+            failed += 1
+
+    print(f"\n{'='*65}")
+    print(f"  Results: {passed} passed, {failed} failed / {len(tests)} total")
+    print("="*65)
 
 
 if __name__ == "__main__":
-    try:
-        run_all_tests()
-    except KeyboardInterrupt:
-        print("\n\nTests interrupted by user")
-    except Exception as e:
-        print(f"\n\n❌ Test suite error: {str(e)}")
+    run_all()

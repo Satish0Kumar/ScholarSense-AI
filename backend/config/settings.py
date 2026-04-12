@@ -21,10 +21,10 @@ METADATA_PATH = MODEL_DIR / "model_metadata.pkl"
 
 # Risk level mappings
 RISK_LABELS = {
-    0: 'Low Risk',
-    1: 'Medium Risk',
-    2: 'High Risk',
-    3: 'Critical Risk'
+    0: 'Low',
+    1: 'Medium',
+    2: 'High',
+    3: 'Critical'
 }
 
 RISK_COLORS = {
@@ -34,14 +34,13 @@ RISK_COLORS = {
     3: 'darkred'
 }
 
-# Feature names (must match training data)
+# Feature names - must match prediction_service.py and train_model.py
 FEATURE_NAMES = [
-    'age', 'gender_encoded', 'grade', 'socioeconomic_status_encoded',
-    'parent_education_encoded', 'current_gpa', 'previous_gpa',
-    'grade_trend', 'attendance_percentage', 'failed_subjects',
-    'assignment_submission_rate', 'disciplinary_incidents',
-    'counseling_visits', 'consecutive_absences', 'late_arrivals',
-    'library_visits', 'extracurricular_participation'
+    'age', 'grade', 'gender', 'socioeconomic_status', 'parent_education',
+    'current_gpa', 'previous_gpa', 'grade_trend', 'attendance_rate',
+    'failed_subjects', 'assignment_submission_rate', 'behavioral_incidents',
+    'math_score', 'science_score', 'english_score', 'social_score',
+    'language_score'
 ]
 
 # Valid input values
@@ -54,6 +53,6 @@ VALID_GRADES = [6, 7, 8, 9, 10]  # Grades 6-10 only (per schema and training dat
 API_HOST = os.getenv("API_HOST", "127.0.0.1")
 API_PORT = int(os.getenv("API_PORT", 5000))
 
-print(f"✓ Configuration loaded")
+print("[OK] Configuration loaded")
 print(f"  Model directory: {MODEL_DIR}")
 print(f"  API will run on: {API_HOST}:{API_PORT}")

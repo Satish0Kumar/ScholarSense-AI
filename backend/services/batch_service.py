@@ -26,14 +26,6 @@ RISK_COLORS = {
 class BatchService:
     """Batch Risk Analysis Service"""
 
-    @staticmethod
-    def get_db():
-        db = SessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
-
     # ──────────────────────────────────────────
     # RUN BATCH PREDICTIONS
     # ──────────────────────────────────────────
@@ -45,7 +37,7 @@ class BatchService:
         Filters: grade, section, risk_label (re-predict only specific risk levels)
         Returns: summary + per-student results
         """
-        db = next(BatchService.get_db())
+        db = SessionLocal()
         try:
             # ── Build student query ────────────────────────
             query = db.query(Student).filter(Student.is_active == True)
@@ -199,6 +191,8 @@ class BatchService:
         except Exception as e:
             print(f"❌ Batch prediction error: {e}")
             return {"status": "error", "message": str(e)}
+        finally:
+            db.close()
 
     # ──────────────────────────────────────────
     # GET LATEST PREDICTIONS (No re-run)
@@ -212,7 +206,7 @@ class BatchService:
         Filters: grade, section, risk_label, limit
         Returns: list of students with their latest prediction
         """
-        db = next(BatchService.get_db())
+        db = SessionLocal()
         try:
             # Subquery: latest prediction ID per student
             latest_pred_subq = db.query(
@@ -300,6 +294,8 @@ class BatchService:
         except Exception as e:
             print(f"❌ Get all predictions error: {e}")
             return {"status": "error", "message": str(e)}
+        finally:
+            db.close()
 
     # ──────────────────────────────────────────
     # GET STUDENTS WITHOUT PREDICTIONS
@@ -311,7 +307,7 @@ class BatchService:
         Find active students who have NO prediction yet
         Useful for identifying who needs first-time prediction
         """
-        db = next(BatchService.get_db())
+        db = SessionLocal()
         try:
             # Students who have at least one prediction
             predicted_ids = db.query(
@@ -349,6 +345,8 @@ class BatchService:
         except Exception as e:
             print(f"❌ Get unpredicted students error: {e}")
             return {"status": "error", "message": str(e)}
+        finally:
+            db.close()
 
     # ──────────────────────────────────────────
     # GET BATCH SUMMARY STATS
@@ -360,7 +358,7 @@ class BatchService:
         Get overall risk summary across all active students
         Returns: counts per risk level + school-wide stats
         """
-        db = next(BatchService.get_db())
+        db = SessionLocal()
         try:
             # Latest prediction per student subquery
             latest_subq = db.query(
@@ -381,12 +379,12 @@ class BatchService:
                 if row.risk_label in summary:
                     summary[row.risk_label] = row.count
 
-            total_active     = db.query(func.count()).filter(
+            total_active     = db.query(func.count(Student.id)).filter(
                 Student.is_active == True
             ).scalar()
 
             total_predicted  = db.query(
-                func.count(RiskPrediction.student_id.distinct())
+                func.count(func.distinct(RiskPrediction.student_id))
             ).scalar()
 
             total_unpredicted = total_active - total_predicted
@@ -414,3 +412,5 @@ class BatchService:
         except Exception as e:
             print(f"❌ Batch summary error: {e}")
             return {"status": "error", "message": str(e)}
+        finally:
+            db.close()

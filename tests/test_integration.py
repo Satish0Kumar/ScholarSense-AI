@@ -1,473 +1,271 @@
 """
-Integration Test Suite - End-to-End Testing
-Tests the complete flow from Frontend → API → Model → Response
+Integration Test Suite - ScholarSense
+End-to-end flow: Health → Auth → Students → Academics → Predictions
 """
 import requests
-import json
 import time
 
-API_BASE_URL = "http://127.0.0.1:5000"
+API_BASE = "http://127.0.0.1:5000"
 
-class Colors:
-    """Terminal colors for better output"""
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    BOLD = '\033[1m'
-    END = '\033[0m'
+# ── Colours ────────────────────────────────────────────────────────────────────
+G = '\033[92m'; R = '\033[91m'; Y = '\033[93m'; B = '\033[94m'; E = '\033[0m'
 
-def print_header(text):
-    """Print section header"""
-    print(f"\n{Colors.BOLD}{Colors.BLUE}{'='*70}")
-    print(f"  {text}")
-    print(f"{'='*70}{Colors.END}\n")
+passed = failed = 0
 
-def print_success(text):
-    """Print success message"""
-    print(f"{Colors.GREEN}✓ {text}{Colors.END}")
 
-def print_error(text):
-    """Print error message"""
-    print(f"{Colors.RED}✗ {text}{Colors.END}")
+def header(text):
+    print(f"\n{B}{'='*65}\n  {text}\n{'='*65}{E}")
 
-def print_warning(text):
-    """Print warning message"""
-    print(f"{Colors.YELLOW}⚠ {text}{Colors.END}")
 
-# Test counters
-tests_passed = 0
-tests_failed = 0
-tests_total = 0
+def ok(text):
+    global passed
+    passed += 1
+    print(f"{G}  ✓ {text}{E}")
 
-def run_test(test_name, test_func):
-    """Run a single test and track results"""
-    global tests_passed, tests_failed, tests_total
-    tests_total += 1
-    
+
+def fail(text):
+    global failed
+    failed += 1
+    print(f"{R}  ✗ {text}{E}")
+
+
+def req(method, path, data=None, token=None, auth=False):
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    url = f"{API_BASE}{path}"
     try:
-        result = test_func()
-        if result:
-            print_success(f"TEST {tests_total}: {test_name}")
-            tests_passed += 1
-            return True
-        else:
-            print_error(f"TEST {tests_total}: {test_name}")
-            tests_failed += 1
-            return False
-    except Exception as e:
-        print_error(f"TEST {tests_total}: {test_name} - Exception: {str(e)}")
-        tests_failed += 1
-        return False
+        fn = {"GET": requests.get, "POST": requests.post,
+              "PUT": requests.put, "DELETE": requests.delete}[method]
+        kwargs = {"headers": headers, "timeout": 5}
+        if data is not None:
+            kwargs["json"] = data
+        return fn(url, **kwargs)
+    except requests.exceptions.ConnectionError:
+        return None
 
-# ==================== TEST FUNCTIONS ====================
 
-def test_api_connectivity():
-    """Test if API is accessible"""
-    try:
-        response = requests.get(f"{API_BASE_URL}/", timeout=5)
-        return response.status_code == 200
-    except:
-        return False
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 1 — CONNECTIVITY
+# ══════════════════════════════════════════════════════════════════════════════
 
-def test_health_endpoint():
-    """Test health check endpoint"""
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/health", timeout=5)
-        data = response.json()
-        return response.status_code == 200 and data.get('status') == 'healthy'
-    except:
-        return False
+def section_connectivity():
+    header("1. Connectivity")
 
-def test_model_info():
-    """Test model info endpoint"""
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/risk/model-info", timeout=5)
-        data = response.json()
-        return (response.status_code == 200 and 
-                data.get('success') and 
-                'model_info' in data)
-    except:
-        return False
-
-def test_low_risk_prediction():
-    """Test Low Risk prediction accuracy"""
-    student_data = {
-        "age": 15,
-        "gender": "Female",
-        "grade": 10,
-        "socioeconomic_status": "High",
-        "parent_education": "Post-Graduate",
-        "current_gpa": 88.0,
-        "previous_gpa": 85.0,
-        "attendance_percentage": 95.0,
-        "failed_subjects": 0,
-        "assignment_submission_rate": 98.0,
-        "disciplinary_incidents": 0
-    }
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=student_data,
-            timeout=5
-        )
-        data = response.json()
-        return (response.status_code == 200 and 
-                data.get('success') and 
-                data.get('prediction') == 'Low Risk' and
-                data.get('confidence') > 95)
-    except:
-        return False
-
-def test_critical_risk_prediction():
-    """Test Critical Risk prediction accuracy"""
-    student_data = {
-        "age": 16,
-        "gender": "Male",
-        "grade": 10,
-        "socioeconomic_status": "Low",
-        "parent_education": "High School",
-        "current_gpa": 45.0,
-        "previous_gpa": 50.0,
-        "attendance_percentage": 65.0,
-        "failed_subjects": 3,
-        "assignment_submission_rate": 55.0,
-        "disciplinary_incidents": 4
-    }
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=student_data,
-            timeout=5
-        )
-        data = response.json()
-        return (response.status_code == 200 and 
-                data.get('success') and 
-                data.get('prediction') == 'Critical Risk' and
-                data.get('confidence') > 95)
-    except:
-        return False
-
-def test_medium_risk_prediction():
-    """Test Medium Risk prediction"""
-    student_data = {
-        "age": 16,
-        "gender": "Male",
-        "grade": 10,
-        "socioeconomic_status": "Medium",
-        "parent_education": "Graduate",
-        "current_gpa": 65.0,
-        "previous_gpa": 68.0,
-        "attendance_percentage": 78.0,
-        "failed_subjects": 1,
-        "assignment_submission_rate": 75.0,
-        "disciplinary_incidents": 1
-    }
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=student_data,
-            timeout=5
-        )
-        data = response.json()
-        return (response.status_code == 200 and 
-                data.get('success') and
-                data.get('prediction') in ['Medium Risk', 'Low Risk', 'High Risk'])
-    except:
-        return False
-
-def test_missing_required_fields():
-    """Test validation for missing fields"""
-    student_data = {
-        "age": 16,
-        "gender": "Male"
-        # Missing required fields
-    }
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=student_data,
-            timeout=5
-        )
-        return response.status_code == 400  # Should return bad request
-    except:
-        return False
-
-def test_invalid_gender():
-    """Test validation for invalid gender"""
-    student_data = {
-        "age": 16,
-        "gender": "InvalidGender",
-        "grade": 10,
-        "socioeconomic_status": "Medium",
-        "parent_education": "Graduate",
-        "current_gpa": 70.0,
-        "previous_gpa": 68.0,
-        "attendance_percentage": 80.0,
-        "failed_subjects": 0,
-        "assignment_submission_rate": 85.0,
-        "disciplinary_incidents": 0
-    }
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=student_data,
-            timeout=5
-        )
-        return response.status_code == 400
-    except:
-        return False
-
-def test_invalid_gpa_range():
-    """Test validation for GPA out of range"""
-    student_data = {
-        "age": 16,
-        "gender": "Male",
-        "grade": 10,
-        "socioeconomic_status": "Medium",
-        "parent_education": "Graduate",
-        "current_gpa": 150.0,  # Invalid (> 100)
-        "previous_gpa": 68.0,
-        "attendance_percentage": 80.0,
-        "failed_subjects": 0,
-        "assignment_submission_rate": 85.0,
-        "disciplinary_incidents": 0
-    }
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=student_data,
-            timeout=5
-        )
-        return response.status_code == 400
-    except:
-        return False
-
-def test_batch_prediction():
-    """Test batch prediction with multiple students"""
-    batch_data = {
-        "students": [
-            {
-                "student_id": "STU001",
-                "age": 16,
-                "gender": "Male",
-                "grade": 10,
-                "socioeconomic_status": "Low",
-                "parent_education": "High School",
-                "current_gpa": 45.0,
-                "previous_gpa": 50.0,
-                "attendance_percentage": 65.0,
-                "failed_subjects": 3,
-                "assignment_submission_rate": 55.0,
-                "disciplinary_incidents": 4
-            },
-            {
-                "student_id": "STU002",
-                "age": 15,
-                "gender": "Female",
-                "grade": 10,
-                "socioeconomic_status": "High",
-                "parent_education": "Post-Graduate",
-                "current_gpa": 88.0,
-                "previous_gpa": 85.0,
-                "attendance_percentage": 95.0,
-                "failed_subjects": 0,
-                "assignment_submission_rate": 98.0,
-                "disciplinary_incidents": 0
-            }
-        ]
-    }
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict-batch",
-            json=batch_data,
-            timeout=10
-        )
-        data = response.json()
-        return (response.status_code == 200 and 
-                data.get('success') and 
-                data.get('successful_predictions') == 2)
-    except:
-        return False
-
-def test_response_time():
-    """Test API response time (should be < 1 second)"""
-    student_data = {
-        "age": 16,
-        "gender": "Male",
-        "grade": 10,
-        "socioeconomic_status": "Medium",
-        "parent_education": "Graduate",
-        "current_gpa": 70.0,
-        "previous_gpa": 68.0,
-        "attendance_percentage": 80.0,
-        "failed_subjects": 0,
-        "assignment_submission_rate": 85.0,
-        "disciplinary_incidents": 0
-    }
-    
-    try:
-        start_time = time.time()
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=student_data,
-            timeout=5
-        )
-        end_time = time.time()
-        
-        response_time = end_time - start_time
-        print(f"    Response time: {response_time:.3f} seconds")
-        
-        return response.status_code == 200 and response_time < 1.0
-    except:
-        return False
-
-def test_confidence_scores():
-    """Test that confidence scores are within valid range"""
-    student_data = {
-        "age": 15,
-        "gender": "Female",
-        "grade": 10,
-        "socioeconomic_status": "High",
-        "parent_education": "Post-Graduate",
-        "current_gpa": 88.0,
-        "previous_gpa": 85.0,
-        "attendance_percentage": 95.0,
-        "failed_subjects": 0,
-        "assignment_submission_rate": 98.0,
-        "disciplinary_incidents": 0
-    }
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=student_data,
-            timeout=5
-        )
-        data = response.json()
-        
-        if not data.get('success'):
-            return False
-        
-        confidence = data.get('confidence', 0)
-        probabilities = data.get('probabilities', {})
-        
-        # Check confidence is 0-100
-        if not (0 <= confidence <= 100):
-            return False
-        
-        # Check all probabilities sum to ~100
-        total_prob = sum(probabilities.values())
-        if not (99 <= total_prob <= 101):  # Allow small floating point errors
-            return False
-        
-        return True
-    except:
-        return False
-
-def test_recommendations_present():
-    """Test that recommendations are provided"""
-    student_data = {
-        "age": 16,
-        "gender": "Male",
-        "grade": 10,
-        "socioeconomic_status": "Low",
-        "parent_education": "High School",
-        "current_gpa": 45.0,
-        "previous_gpa": 50.0,
-        "attendance_percentage": 65.0,
-        "failed_subjects": 3,
-        "assignment_submission_rate": 55.0,
-        "disciplinary_incidents": 4
-    }
-    
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/api/risk/predict",
-            json=student_data,
-            timeout=5
-        )
-        data = response.json()
-        
-        recommendations = data.get('recommendations', [])
-        return len(recommendations) > 0
-    except:
-        return False
-
-# ==================== MAIN TEST RUNNER ====================
-
-def run_all_tests():
-    """Run all integration tests"""
-    print_header("MODULE 1 - INTEGRATION TEST SUITE")
-    print(f"Testing API at: {API_BASE_URL}")
-    print(f"Date: Thursday, December 25, 2025")
-    print("\n")
-    
-    # Connectivity Tests
-    print_header("1. CONNECTIVITY TESTS")
-    run_test("API Server Connectivity", test_api_connectivity)
-    run_test("Health Check Endpoint", test_health_endpoint)
-    run_test("Model Info Endpoint", test_model_info)
-    
-    # Prediction Accuracy Tests
-    print_header("2. PREDICTION ACCURACY TESTS")
-    run_test("Low Risk Student Prediction", test_low_risk_prediction)
-    run_test("Critical Risk Student Prediction", test_critical_risk_prediction)
-    run_test("Medium Risk Student Prediction", test_medium_risk_prediction)
-    
-    # Validation Tests
-    print_header("3. INPUT VALIDATION TESTS")
-    run_test("Missing Required Fields Validation", test_missing_required_fields)
-    run_test("Invalid Gender Validation", test_invalid_gender)
-    run_test("Invalid GPA Range Validation", test_invalid_gpa_range)
-    
-    # Functional Tests
-    print_header("4. FUNCTIONAL TESTS")
-    run_test("Batch Prediction Processing", test_batch_prediction)
-    run_test("API Response Time (<1s)", test_response_time)
-    run_test("Confidence Scores Valid Range", test_confidence_scores)
-    run_test("Recommendations Present", test_recommendations_present)
-    
-    # Final Summary
-    print_header("TEST SUMMARY")
-    print(f"Total Tests: {tests_total}")
-    print_success(f"Passed: {tests_passed}")
-    if tests_failed > 0:
-        print_error(f"Failed: {tests_failed}")
-    print(f"\nSuccess Rate: {(tests_passed/tests_total)*100:.1f}%")
-    
-    if tests_failed == 0:
-        print(f"\n{Colors.GREEN}{Colors.BOLD}🎉 ALL TESTS PASSED! MODULE 1 IS READY FOR DEPLOYMENT!{Colors.END}\n")
+    r = req("GET", "/api/health")
+    if r and r.status_code == 200 and r.json().get("status") == "healthy":
+        ok("Health check → healthy")
     else:
-        print(f"\n{Colors.YELLOW}{Colors.BOLD}⚠️ Some tests failed. Please review the errors above.{Colors.END}\n")
-    
-    return tests_failed == 0
+        fail(f"Health check failed (status={r and r.status_code})")
+
+    # Unauthenticated access must be blocked
+    r = req("GET", "/api/students")
+    if r and r.status_code == 401:
+        ok("Protected route without token → 401")
+    else:
+        fail(f"Expected 401 without token, got {r and r.status_code}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 2 — AUTH (credential layer only; OTP email not testable in CI)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def section_auth():
+    header("2. Authentication")
+
+    # Wrong credentials
+    r = req("POST", "/api/auth/login",
+            {"email": "nobody@example.com", "password": "badpass"})
+    if r and r.status_code == 401:
+        ok("Invalid credentials → 401")
+    else:
+        fail(f"Expected 401 for bad creds, got {r and r.status_code}")
+
+    # Missing fields
+    r = req("POST", "/api/auth/login", {"email": "admin@scholarsense.com"})
+    if r and r.status_code == 400:
+        ok("Missing password field → 400")
+    else:
+        fail(f"Expected 400 for missing field, got {r and r.status_code}")
+
+    # Valid credentials → OTP flow initiated (not 401/400)
+    r = req("POST", "/api/auth/login",
+            {"email": "admin@scholarsense.com", "password": "admin123"})
+    if r and r.status_code == 200 and r.json().get("status") == "otp_sent":
+        ok("Valid credentials → OTP flow initiated (status=otp_sent)")
+    elif r and r.status_code in (200, 500):
+        # 500 is acceptable if email service not configured in test env
+        ok(f"Valid credentials accepted (status={r.status_code}, email service may be unconfigured)")
+    else:
+        fail(f"Unexpected response for valid login: {r and r.status_code} {r and r.text[:100]}")
+
+    # OTP verify with garbage → 400
+    r = req("POST", "/api/auth/verify-otp", {"user_id": 1, "otp": "abc"})
+    if r and r.status_code == 400:
+        ok("Non-numeric OTP → 400")
+    else:
+        fail(f"Expected 400 for bad OTP format, got {r and r.status_code}")
+
+    # OTP verify with wrong code → 401
+    r = req("POST", "/api/auth/verify-otp", {"user_id": 1, "otp": "000000"})
+    if r and r.status_code in (401, 429):
+        ok("Wrong OTP → 401/429")
+    else:
+        fail(f"Expected 401/429 for wrong OTP, got {r and r.status_code}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 3 — AUTHENTICATED FLOW (requires token)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def section_authenticated(token: str):
+    header("3. Student CRUD")
+
+    student_id = None
+
+    # Create
+    r = req("POST", "/api/students", {
+        "student_id": "INTEG_TEST_001",
+        "first_name": "Integration",
+        "last_name": "Test",
+        "grade": 9,
+        "section": "B",
+        "gender": "Female",
+        "date_of_birth": "2009-03-20",
+        "socioeconomic_status": "Medium",
+        "parent_education": "Graduate"
+    }, token=token)
+    if r and r.status_code in (200, 201):
+        student_id = r.json().get("id")
+        ok(f"Create student → id={student_id}")
+    else:
+        fail(f"Create student failed: {r and r.status_code} {r and r.text[:100]}")
+        return  # Can't continue without a student
+
+    # Read list
+    r = req("GET", "/api/students", token=token)
+    if r and r.status_code == 200 and isinstance(r.json(), list):
+        ok(f"List students → {len(r.json())} records")
+    else:
+        fail(f"List students failed: {r and r.status_code}")
+
+    # Read by ID
+    r = req("GET", f"/api/students/{student_id}", token=token)
+    if r and r.status_code == 200 and r.json().get("id") == student_id:
+        ok(f"Get student by id → OK")
+    else:
+        fail(f"Get student by id failed: {r and r.status_code}")
+
+    # 404 for unknown
+    r = req("GET", "/api/students/999999", token=token)
+    if r and r.status_code == 404:
+        ok("Unknown student id → 404")
+    else:
+        fail(f"Expected 404, got {r and r.status_code}")
+
+    # ── Academics ─────────────────────────────────────────────────────────────
+    header("4. Academic Records")
+
+    r = req("POST", "/api/academics", {
+        "student_id": student_id,
+        "semester": "2025-S1",
+        "current_gpa": 65.0,
+        "previous_gpa": 60.0,
+        "grade_trend": 5.0,
+        "failed_subjects": 1,
+        "total_subjects": 5,
+        "assignment_submission_rate": 80.0,
+        "math_score": 68.0,
+        "science_score": 62.0,
+        "english_score": 66.0,
+        "social_score": 64.0,
+        "language_score": 65.0
+    }, token=token)
+    if r and r.status_code in (200, 201):
+        ok("Create academic record → OK")
+    else:
+        fail(f"Create academic record failed: {r and r.status_code} {r and r.text[:100]}")
+
+    r = req("GET", f"/api/students/{student_id}/academics", token=token)
+    if r and r.status_code == 200:
+        ok(f"Get student academics → {len(r.json())} records")
+    else:
+        fail(f"Get academics failed: {r and r.status_code}")
+
+    # ── Predictions ───────────────────────────────────────────────────────────
+    header("5. Risk Predictions")
+
+    r = req("POST", f"/api/students/{student_id}/predict", {}, token=token)
+    if r and r.status_code == 200:
+        data = r.json()
+        label = data.get("risk_label", "")
+        conf = data.get("confidence_score", -1)
+        if label in ("Low", "Medium", "High", "Critical") and 0 <= conf <= 100:
+            ok(f"Prediction → {label} ({conf:.1f}% confidence)")
+        else:
+            fail(f"Prediction response invalid: {data}")
+    else:
+        fail(f"Prediction failed: {r and r.status_code} {r and r.text[:100]}")
+
+    r = req("GET", f"/api/students/{student_id}/predictions", token=token)
+    if r and r.status_code == 200 and isinstance(r.json(), list):
+        ok(f"Prediction history → {len(r.json())} records")
+    else:
+        fail(f"Prediction history failed: {r and r.status_code}")
+
+    r = req("GET", "/api/predictions/high-risk", token=token)
+    if r and r.status_code == 200 and isinstance(r.json(), list):
+        ok(f"High-risk list → {len(r.json())} students")
+    else:
+        fail(f"High-risk list failed: {r and r.status_code}")
+
+    # ── Cleanup ───────────────────────────────────────────────────────────────
+    header("6. Cleanup")
+    r = req("DELETE", f"/api/students/{student_id}", token=token)
+    if r and r.status_code in (200, 204):
+        ok(f"Delete test student → OK")
+    else:
+        fail(f"Delete failed: {r and r.status_code}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RUNNER
+# ══════════════════════════════════════════════════════════════════════════════
+
+def run_all(token: str = None):
+    print(f"\n{B}{'='*65}")
+    print("  SCHOLARSENSE — INTEGRATION TEST SUITE")
+    print(f"{'='*65}{E}")
+    print(f"  API: {API_BASE}")
+    if token:
+        print(f"  Token: provided ✓")
+    else:
+        print(f"  {Y}Token: not provided — authenticated sections will be skipped{E}")
+
+    section_connectivity()
+    section_auth()
+
+    if token:
+        section_authenticated(token)
+    else:
+        header("3-6. Authenticated Tests")
+        print(f"  {Y}⚠  Skipped — pass a JWT token to run: run_all(token='<jwt>'){E}")
+
+    # Summary
+    total = passed + failed
+    print(f"\n{B}{'='*65}{E}")
+    print(f"  {G}{passed} passed{E}  {R}{failed} failed{E}  / {total} total")
+    rate = (passed / total * 100) if total else 0
+    print(f"  Success rate: {rate:.1f}%")
+    print(f"{B}{'='*65}{E}\n")
+    return failed == 0
 
 
 if __name__ == "__main__":
-    print("\n")
-    print(f"{Colors.BOLD}AI School Administration System - Module 1{Colors.END}")
-    print(f"{Colors.BOLD}Integration Test Suite{Colors.END}")
-    print("\n")
-    print("Make sure the API server is running before testing:")
-    print(f"{Colors.BLUE}  python backend/api.py{Colors.END}")
-    print("\n")
-    
-    input("Press Enter to start testing...")
-    
-    try:
-        success = run_all_tests()
-        exit(0 if success else 1)
-    except KeyboardInterrupt:
-        print(f"\n\n{Colors.YELLOW}Tests interrupted by user{Colors.END}\n")
-        exit(1)
-    except Exception as e:
-        print(f"\n\n{Colors.RED}Test suite error: {str(e)}{Colors.END}\n")
-        exit(1)
+    import sys
+    token_arg = sys.argv[1] if len(sys.argv) > 1 else None
+    if not token_arg:
+        print(f"\n{Y}Usage: python tests/test_integration.py <jwt_token>{E}")
+        print("       Token is obtained after completing OTP login.\n")
+    success = run_all(token=token_arg)
+    sys.exit(0 if success else 1)

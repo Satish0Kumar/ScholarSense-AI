@@ -14,6 +14,7 @@ from .batch_routes        import batch_bp
 from .communication_routes import communication_bp
 from .analytics_routes    import analytics_bp
 from .report_routes       import report_bp
+from .alert_routes        import alert_bp
 
 
 def register_blueprints(app):
@@ -31,3 +32,4 @@ def register_blueprints(app):
     app.register_blueprint(communication_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(report_bp)
+    app.register_blueprint(alert_bp)
