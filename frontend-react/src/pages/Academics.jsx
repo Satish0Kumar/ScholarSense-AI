@@ -154,15 +154,21 @@ const AttendanceTab = () => {
       const list = res.data || [];
       setStudents(list);
       const map = {};
-      let posted = false;
+      const validStatuses = ['present', 'absent', 'late', 'excused'];
       list.forEach(s => {
-        if (s.attendance?.status) {
-          map[s.id] = s.attendance.status.charAt(0).toUpperCase() + s.attendance.status.slice(1);
-          posted = true;
-        } else { map[s.id] = 'Present'; }
+        const raw = s.attendance?.status?.toLowerCase();
+        if (raw && validStatuses.includes(raw)) {
+          map[s.id] = raw.charAt(0).toUpperCase() + raw.slice(1);
+        } else {
+          map[s.id] = 'Present';
+        }
+      });
+      const allPosted = list.length > 0 && list.every(s => {
+        const raw = s.attendance?.status?.toLowerCase();
+        return raw && validStatuses.includes(raw);
       });
       setAttendance(map);
-      setIsPosted(posted);
+      setIsPosted(allPosted);
       setIsEditing(false);
     } catch { setStudents([]); setAttendance({}); setIsPosted(false); setIsEditing(false); }
     finally { setLoading(false); }
@@ -529,7 +535,7 @@ const BehaviourTab = () => {
   const [formData, setFormData] = useState({
     student_id: '',
     incident_date: new Date().toISOString().split('T')[0],
-    incident_type: 'Disruption',
+    incident_type: 'Disciplinary',
     severity: 'Minor',
     description: '',
     location: '',
@@ -642,7 +648,7 @@ const BehaviourTab = () => {
               onChange={e => setFormData({...formData, incident_date:e.target.value})} />
             <StyledSelect label="Incident Type *" value={formData.incident_type}
               onChange={e => setFormData({...formData, incident_type:e.target.value})}>
-              {['Disruption','Fighting','Bullying','Vandalism','Disrespect','Other'].map(t => (
+              {['Disciplinary','Disruptive','Bullying','Late Arrival','Absence','Academic Misconduct','Property Damage','Other'].map(t => (
                 <option key={t} style={{background:'#1e1b4b'}}>{t}</option>
               ))}
             </StyledSelect>
