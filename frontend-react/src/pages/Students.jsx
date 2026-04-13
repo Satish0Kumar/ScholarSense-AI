@@ -99,133 +99,186 @@ const Students = () => {
     }
   };
 
-  if (loading && !selectedStudent) return <div className="text-center py-8">Loading...</div>;
+  const getRiskStyle = (risk) => {
+    const map = {
+      Critical: { bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.4)',  color: '#fca5a5' },
+      High:     { bg: 'rgba(249,115,22,0.15)', border: 'rgba(249,115,22,0.4)', color: '#fdba74' },
+      Medium:   { bg: 'rgba(234,179,8,0.15)',  border: 'rgba(234,179,8,0.4)',  color: '#fde047' },
+      Low:      { bg: 'rgba(34,197,94,0.15)',  border: 'rgba(34,197,94,0.4)',  color: '#86efac' },
+    };
+    return map[risk] || { bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.3)', color: '#a5b4fc' };
+  };
+
+  const glass = {
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(99,102,241,0.2)',
+    backdropFilter: 'blur(12px)',
+  };
+
+  if (loading && !selectedStudent) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center gap-3">
+        <svg className="animate-spin w-10 h-10 text-indigo-400" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+        </svg>
+        <p className="text-indigo-300 text-sm">Loading students...</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
       {/* Header with Tabs */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">Students</h1>
-        <div className="flex gap-2 border-b">
-          <button
-            onClick={() => setActiveTab('list')}
-            className={`px-6 py-3 font-semibold transition ${
-              activeTab === 'list'
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-          >
-            📋 Students List
-          </button>
-          <button
-            onClick={() => setActiveTab('add')}
-            className={`px-6 py-3 font-semibold transition ${
-              activeTab === 'add'
-                ? 'border-b-2 border-green-600 text-green-600'
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-          >
-            ➕ Add New Student
-          </button>
-          <button
-            onClick={() => setActiveTab('profile')}
-            className={`px-6 py-3 font-semibold transition ${
-              activeTab === 'profile'
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-          >
-            👤 Student Profile {selectedStudent && `- ${selectedStudent.first_name} ${selectedStudent.last_name}`}
-          </button>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Students</h1>
+            <p className="text-sm mt-0.5" style={{ color: 'rgba(165,180,252,0.6)' }}>Manage and monitor student records</p>
+          </div>
+          <div className="text-sm font-medium px-3 py-1.5 rounded-xl" style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc' }}>
+            {filteredStudents.length} student{filteredStudents.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+        <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.2)' }}>
+          {[
+            { key: 'list',    icon: '📋', label: 'Students List' },
+            { key: 'add',     icon: '➕', label: 'Add New Student' },
+            { key: 'profile', icon: '👤', label: selectedStudent ? `${selectedStudent.first_name} ${selectedStudent.last_name}` : 'Student Profile' },
+          ].map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200"
+              style={activeTab === tab.key
+                ? { background: 'linear-gradient(135deg, rgba(99,102,241,0.5), rgba(139,92,246,0.4))', color: '#fff', border: '1px solid rgba(99,102,241,0.5)' }
+                : { color: 'rgba(165,180,252,0.6)', border: '1px solid transparent' }
+              }>
+              <span>{tab.icon}</span>
+              <span className="hidden sm:inline truncate max-w-[140px]">{tab.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Students List Tab */}
       {activeTab === 'list' && (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-3">
-            <input
-              type="text"
-              placeholder="🔍 Search by name or ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 min-w-[250px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+          {/* Search & Filters */}
+          <div className="flex flex-wrap gap-3 p-4 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <div className="relative flex-1 min-w-[220px]">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400 text-sm">🔍</span>
+              <input
+                type="text"
+                placeholder="Search by name or ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl text-white text-sm outline-none transition-all duration-200"
+                style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#fff' }}
+                onFocus={e => e.target.style.borderColor = '#6366f1'}
+                onBlur={e => e.target.style.borderColor = 'rgba(99,102,241,0.25)'}
+              />
+            </div>
             <select
               value={selectedGrade}
               onChange={(e) => setSelectedGrade(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              className="px-4 py-2.5 rounded-xl text-sm outline-none transition-all duration-200"
+              style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc' }}
             >
-              <option value="">All Grades</option>
+              <option value="" style={{ background: '#1e1b4b' }}>All Grades</option>
               {grades.map(grade => (
-                <option key={grade} value={grade}>Grade {grade}</option>
+                <option key={grade} value={grade} style={{ background: '#1e1b4b' }}>Grade {grade}</option>
               ))}
             </select>
             <select
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              className="px-4 py-2.5 rounded-xl text-sm outline-none transition-all duration-200"
+              style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc' }}
             >
-              <option value="">All Sections</option>
+              <option value="" style={{ background: '#1e1b4b' }}>All Sections</option>
               {sections.map(section => (
-                <option key={section} value={section}>Section {section}</option>
+                <option key={section} value={section} style={{ background: '#1e1b4b' }}>Section {section}</option>
               ))}
             </select>
             {(searchTerm || selectedGrade || selectedSection) && (
               <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setSelectedGrade('');
-                  setSelectedSection('');
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
+                onClick={() => { setSearchTerm(''); setSelectedGrade(''); setSelectedSection(''); }}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
+                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.25)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.12)'}
               >
-                Clear Filters
+                ✕ Clear
               </button>
             )}
           </div>
 
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          {/* Table */}
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.2)', backdropFilter: 'blur(12px)' }}>
             <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Student ID</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Grade</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Section</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Risk Level</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(99,102,241,0.2)', background: 'rgba(99,102,241,0.08)' }}>
+                  {['Student ID', 'Name', 'Grade', 'Section', 'Risk Level', 'Actions'].map(h => (
+                    <th key={h} className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: 'rgba(165,180,252,0.7)' }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-gray-50 transition">
-                    <td className="px-6 py-4 text-sm text-gray-900">{student.student_id}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {student.first_name} {student.last_name}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{student.grade}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{student.section || '-'}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getRiskColor(student.risk_label)}`}>
-                        {student.risk_label || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <button
-                        onClick={() => fetchStudentDetails(student.id)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
-                      >
-                        View Profile
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+              <tbody>
+                {filteredStudents.map((student, idx) => {
+                  const rs = getRiskStyle(student.risk_label);
+                  return (
+                    <tr key={student.id}
+                      className="transition-all duration-150 group"
+                      style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.08)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <td className="px-5 py-3.5">
+                        <span className="text-xs font-mono px-2 py-1 rounded-lg" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
+                          {student.student_id}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                            {student.first_name?.[0]}{student.last_name?.[0]}
+                          </div>
+                          <span className="text-sm font-semibold text-white">{student.first_name} {student.last_name}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="text-sm" style={{ color: 'rgba(165,180,252,0.8)' }}>{student.grade}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="text-sm" style={{ color: 'rgba(165,180,252,0.8)' }}>{student.section || '—'}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold"
+                          style={{ background: rs.bg, border: `1px solid ${rs.border}`, color: rs.color }}>
+                          {student.risk_label || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <button
+                          onClick={() => fetchStudentDetails(student.id)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
+                          style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: '#a5b4fc' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.4)'; e.currentTarget.style.color = '#fff'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.2)'; e.currentTarget.style.color = '#a5b4fc'; }}
+                        >
+                          View Profile →
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {filteredStudents.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                No students found
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <span className="text-4xl">🔍</span>
+                <p className="text-sm" style={{ color: 'rgba(165,180,252,0.5)' }}>No students found matching your filters</p>
               </div>
             )}
           </div>

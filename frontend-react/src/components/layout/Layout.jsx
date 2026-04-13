@@ -4,11 +4,11 @@ import Header from './Header';
 
 const Layout = () => {
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen" style={{ background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)' }}>
       <Sidebar />
-      <div className="flex-1 ml-64">
+      <div className="flex-1 ml-64 flex flex-col min-h-0">
         <Header />
-        <main className="mt-16 p-6 overflow-y-auto h-[calc(100vh-4rem)]">
+        <main className="flex-1 mt-16 p-6 overflow-y-auto">
           <Outlet />
         </main>
       </div>
