@@ -55,7 +55,7 @@ print(f"   Algorithm: {app.config['JWT_ALGORITHM']}\n")
 
 # ── Extensions ─────────────────────────────────────────────────────────
 # Allow specific origins for security
-allowed_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:8501').split(',')
+allowed_origins = os.getenv('CORS_ORIGINS', 'http://localhost:5173,http://localhost:3000').split(',')
 CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 jwt = JWTManager(app)
 @jwt.token_in_blocklist_loader
@@ -138,7 +138,8 @@ if __name__ == '__main__':
         print("✅ Database connected - Starting server...")
         print_startup_message()
         debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-        app.run(debug=debug_mode, host='0.0.0.0', port=5001)
+        port = int(os.getenv('PORT', 5001))  # Use Render's PORT or default to 5001
+        app.run(debug=debug_mode, host='0.0.0.0', port=port)
     else:
         print("❌ Database connection failed!")
         sys.exit(1)
