@@ -6,35 +6,43 @@ const Alerts = () => {
   const [activeTab, setActiveTab] = useState('academic');
 
   const tabs = [
-    { id: 'academic', label: '📊 Academic Performance Alerts' },
-    { id: 'attendance', label: '📅 Attendance Alerts' },
+    { id: 'academic',    label: 'Academic Performance Alerts' },
+    { id: 'attendance',  label: 'Attendance Alerts' },
   ];
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Alert Management System</h1>
-      <div className="bg-white rounded-lg shadow">
-        <div className="border-b">
-          <div className="flex">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-6 py-3 font-medium ${
-                  activeTab === tab.id
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-gray-600 hover:text-gray-800'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+    <div className="space-y-6">
+      {/* ── Page Header ── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Alert Management</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'rgba(165,180,252,0.6)' }}>
+            Academic &amp; attendance alerts for at-risk students
+          </p>
         </div>
-        <div className="p-6">
-          {activeTab === 'academic' && <AcademicAlertsTab />}
-          {activeTab === 'attendance' && <AttendanceAlertsTab />}
-        </div>
+      </div>
+
+      {/* ── Tab Switcher ── */}
+      <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.2)', backdropFilter: 'blur(12px)' }}>
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200"
+            style={activeTab === tab.id
+              ? { background: 'linear-gradient(135deg, rgba(99,102,241,0.5), rgba(139,92,246,0.4))', color: '#fff', border: '1px solid rgba(99,102,241,0.5)' }
+              : { color: 'rgba(165,180,252,0.6)', border: '1px solid transparent' }
+            }>
+            <span>{tab.id === 'academic' ? '📊' : '📅'}</span>
+            <span className="hidden sm:inline">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Tab Body ── */}
+      <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.2)', backdropFilter: 'blur(12px)' }}>
+        {activeTab === 'academic'   && <AcademicAlertsTab />}
+        {activeTab === 'attendance' && <AttendanceAlertsTab />}
       </div>
     </div>
   );
@@ -151,6 +159,16 @@ const AcademicAlertsTab = () => {
     }
   };
 
+  const getRiskStyle = (risk) => {
+    const map = {
+      Critical: { bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.4)',  color: '#fca5a5' },
+      High:     { bg: 'rgba(249,115,22,0.15)', border: 'rgba(249,115,22,0.4)', color: '#fdba74' },
+      Medium:   { bg: 'rgba(234,179,8,0.15)',  border: 'rgba(234,179,8,0.4)',  color: '#fde047' },
+      Low:      { bg: 'rgba(34,197,94,0.15)',  border: 'rgba(34,197,94,0.4)',  color: '#86efac' },
+    };
+    return map[risk] || { bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.3)', color: '#a5b4fc' };
+  };
+
   const getRiskColor = (riskLabel) => {
     switch(riskLabel?.toLowerCase()) {
       case 'critical': return 'bg-red-100 text-red-800 border-red-300';
@@ -176,129 +194,144 @@ const AcademicAlertsTab = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <div className="text-3xl">📊</div>
-          <div className="flex-1">
-            <h3 className="text-lg font-bold text-gray-800 mb-1">
-              Academic Performance Alert System
-            </h3>
-            <p className="text-sm text-gray-600">
-              Send comprehensive PDF reports to parents of high-risk students including progress report, 
-              risk factors analysis, and detailed improvement suggestions.
-            </p>
-          </div>
+      {/* Info Banner */}
+      <div className="flex items-center gap-4 p-4 rounded-2xl"
+        style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.25)' }}>
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+          style={{ background: 'rgba(249,115,22,0.15)' }}>📊</div>
+        <div>
+          <p className="font-semibold text-sm text-white">Academic Performance Alert System</p>
+          <p className="text-xs mt-0.5" style={{ color: 'rgba(165,180,252,0.6)' }}>
+            Send comprehensive PDF reports to parents of high-risk students including progress report,
+            risk factors analysis, and detailed improvement suggestions.
+          </p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <h3 className="font-semibold text-gray-700 mb-3">Filter Students</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Grade</label>
-            <select
-              value={selectedGrade}
-              onChange={(e) => setSelectedGrade(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Grades</option>
-              {grades.map(g => (
-                <option key={g} value={g}>Grade {g}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Section</label>
-            <select
-              value={selectedSection}
-              onChange={(e) => setSelectedSection(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Sections</option>
-              {sections.map(s => (
-                <option key={s} value={s}>Section {s}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setSelectedGrade('');
-                setSelectedSection('');
-              }}
-              className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </div>
+      <div className="flex flex-wrap gap-3 p-4 rounded-2xl"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.2)' }}>
+        <select
+          value={selectedGrade}
+          onChange={(e) => setSelectedGrade(e.target.value)}
+          className="px-4 py-2.5 rounded-xl text-sm outline-none transition-all duration-200"
+          style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc' }}
+        >
+          <option value="" style={{ background: '#1e1b4b' }}>All Grades</option>
+          {grades.map(g => <option key={g} value={g} style={{ background: '#1e1b4b' }}>Grade {g}</option>)}
+        </select>
+        <select
+          value={selectedSection}
+          onChange={(e) => setSelectedSection(e.target.value)}
+          className="px-4 py-2.5 rounded-xl text-sm outline-none transition-all duration-200"
+          style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc' }}
+        >
+          <option value="" style={{ background: '#1e1b4b' }}>All Sections</option>
+          {sections.map(s => <option key={s} value={s} style={{ background: '#1e1b4b' }}>Section {s}</option>)}
+        </select>
+        {(selectedGrade || selectedSection) && (
+          <button
+            onClick={() => { setSelectedGrade(''); setSelectedSection(''); }}
+            className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
+            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.25)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.12)'}
+          >
+            ✕ Clear
+          </button>
+        )}
       </div>
 
-      {/* Statistics */}
+      {/* Stat Cards */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white border rounded-lg p-4">
-          <p className="text-sm text-gray-500">Total High-Risk Students</p>
-          <p className="text-3xl font-bold text-gray-800">{students.length}</p>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm text-gray-600">Critical Risk</p>
-          <p className="text-3xl font-bold text-red-700">
-            {students.filter(s => s.prediction?.risk_label?.toLowerCase() === 'critical').length}
-          </p>
-        </div>
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-          <p className="text-sm text-gray-600">High Risk</p>
-          <p className="text-3xl font-bold text-orange-700">
-            {students.filter(s => s.prediction?.risk_label?.toLowerCase() === 'high').length}
-          </p>
-        </div>
+        {[
+          { label: 'Total High-Risk', value: students.length, icon: '⚠️', bg: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(99,102,241,0.1))', border: 'rgba(99,102,241,0.4)' },
+          { label: 'Critical Risk',   value: students.filter(s => s.prediction?.risk_label?.toLowerCase() === 'critical').length, icon: '🔴', bg: 'linear-gradient(135deg, rgba(239,68,68,0.3), rgba(239,68,68,0.1))', border: 'rgba(239,68,68,0.4)' },
+          { label: 'High Risk',       value: students.filter(s => s.prediction?.risk_label?.toLowerCase() === 'high').length,     icon: '🟠', bg: 'linear-gradient(135deg, rgba(249,115,22,0.3), rgba(249,115,22,0.1))', border: 'rgba(249,115,22,0.4)' },
+        ].map(card => (
+          <div key={card.label} className="rounded-2xl p-5 flex items-center gap-4 transition-all duration-200 hover:-translate-y-1"
+            style={{ background: card.bg, border: `1px solid ${card.border}` }}>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+              style={{ background: 'rgba(0,0,0,0.2)' }}>{card.icon}</div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.6)' }}>{card.label}</p>
+              <p className="text-3xl font-bold text-white mt-0.5">{card.value}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Student List */}
       <div>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-semibold">High-Risk Students ({filteredStudents.length})</h3>
-          <div className="flex gap-2">
-            <button
-              onClick={fetchHighRiskStudents}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              🔄 Refresh
-            </button>
-          </div>
+      {/* List Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h3 className="text-base font-bold text-white">High-Risk Students</h3>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-xl"
+            style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc' }}>
+            {filteredStudents.length} student{filteredStudents.length !== 1 ? 's' : ''}
+          </span>
         </div>
+        <button
+          onClick={fetchHighRiskStudents}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200"
+          style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc' }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.3)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(99,102,241,0.15)'}
+        >
+          🔄 Refresh
+        </button>
+      </div>
 
         {/* Batch Select Bar */}
         {filteredStudents.length > 0 && (
-          <div className="bg-gray-50 border rounded-lg p-3 mb-4 flex justify-between items-center">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <div className="flex justify-between items-center p-3 rounded-2xl"
+            style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <label className="flex items-center gap-2.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
                 onChange={toggleSelectAll}
-                className="w-4 h-4"
+                className="w-4 h-4 accent-indigo-500"
               />
-              <span className="text-sm font-medium text-gray-700">
-                Select All &nbsp;·&nbsp; {selectedStudents.length} of {filteredStudents.length} selected
+              <span className="text-sm font-medium" style={{ color: '#a5b4fc' }}>
+                Select All
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded-lg"
+                style={{ background: 'rgba(99,102,241,0.15)', color: 'rgba(165,180,252,0.7)' }}>
+                {selectedStudents.length} of {filteredStudents.length}
               </span>
             </label>
             <button
               onClick={handleSendBatchAlerts}
               disabled={sending || selectedStudents.length === 0}
-              className="px-5 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-40"
+              style={{ background: selectedStudents.length === 0 ? 'rgba(249,115,22,0.1)' : 'linear-gradient(135deg, rgba(249,115,22,0.6), rgba(239,68,68,0.5))', border: '1px solid rgba(249,115,22,0.4)', color: selectedStudents.length === 0 ? '#fdba74' : '#fff' }}
+              onMouseEnter={e => { if (selectedStudents.length > 0) e.currentTarget.style.opacity = '0.85'; }}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
-              {sending ? 'Sending...' : `📧 Send Alerts to ${selectedStudents.length} Selected`}
+              {sending
+                ? <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Sending...</>
+                : `📧 Send Alerts to ${selectedStudents.length} Selected`
+              }
             </button>
           </div>
         )}
 
         {loading ? (
-          <div className="text-center py-8">Loading students...</div>
+          <div className="flex items-center justify-center py-16 gap-3">
+            <svg className="animate-spin w-7 h-7 text-indigo-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            <p className="text-indigo-300 text-sm">Loading students...</p>
+          </div>
         ) : filteredStudents.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            {students.length === 0 ? 'No high-risk students found' : 'No students match the selected filters'}
+          <div className="flex flex-col items-center justify-center py-14 gap-3">
+            <span className="text-4xl">{students.length === 0 ? '✅' : '🔍'}</span>
+            <p className="text-sm" style={{ color: 'rgba(165,180,252,0.5)' }}>
+              {students.length === 0 ? 'No high-risk students found' : 'No students match the selected filters'}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -306,47 +339,73 @@ const AcademicAlertsTab = () => {
               const student = item.student || {};
               const prediction = item.prediction || {};
               const riskLabel = prediction.risk_label || 'Unknown';
-              
+              const rs = getRiskStyle(riskLabel);
               return (
-                <div key={student.id} className="border rounded-lg p-4 hover:shadow-md transition">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-start gap-3 flex-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedStudents.includes(student.id)}
-                        onChange={() => toggleSelect(student.id)}
-                        className="mt-1 w-4 h-4 cursor-pointer"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h4 className="text-lg font-semibold text-gray-800">
-                            {student.first_name} {student.last_name}
-                          </h4>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getRiskColor(riskLabel)}`}>
-                            {getRiskIcon(riskLabel)} {riskLabel}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-gray-600">
-                          <p><span className="font-medium">Grade:</span> {student.grade} - Section {student.section}</p>
-                          <p><span className="font-medium">Student ID:</span> {student.student_id}</p>
-                          <p><span className="font-medium">Parent:</span> {student.parent_name || 'N/A'}</p>
-                          <p><span className="font-medium">Email:</span> {student.parent_email || 'N/A'}</p>
-                          <p><span className="font-medium">Confidence:</span> {prediction.confidence_score?.toFixed(1)}%</p>
-                          <p><span className="font-medium">Assessment Date:</span> {prediction.created_at ? new Date(prediction.created_at).toLocaleDateString() : 'N/A'}</p>
-                        </div>
+                <div key={student.id}
+                  className="p-4 rounded-2xl transition-all duration-200"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,0.15)'}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedStudents.includes(student.id)}
+                      onChange={() => toggleSelect(student.id)}
+                      className="mt-1 w-4 h-4 accent-indigo-500 flex-shrink-0 cursor-pointer"
+                    />
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                      {student.first_name?.[0]}{student.last_name?.[0]}
+                    </div>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="text-sm font-bold text-white">{student.first_name} {student.last_name}</span>
+                        <span className="text-xs font-mono px-2 py-0.5 rounded-lg"
+                          style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
+                          {student.student_id}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                          style={{ background: rs.bg, border: `1px solid ${rs.border}`, color: rs.color }}>
+                          {riskLabel}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1">
+                        {[
+                          { label: 'Grade', value: `${student.grade} — Section ${student.section}` },
+                          { label: 'Parent', value: student.parent_name || 'N/A' },
+                          { label: 'Email', value: student.parent_email || 'N/A' },
+                          { label: 'Confidence', value: prediction.confidence_score ? `${prediction.confidence_score.toFixed(1)}%` : 'N/A' },
+                          { label: 'Assessed', value: prediction.created_at ? new Date(prediction.created_at).toLocaleDateString() : 'N/A' },
+                        ].map(f => (
+                          <p key={f.label} className="text-xs">
+                            <span style={{ color: 'rgba(165,180,252,0.5)' }}>{f.label}: </span>
+                            <span style={{ color: 'rgba(165,180,252,0.85)' }}>{f.value}</span>
+                          </p>
+                        ))}
                       </div>
                     </div>
-                    <div className="flex flex-col gap-2">
+                    {/* Action Buttons */}
+                    <div className="flex flex-col gap-2 flex-shrink-0">
                       <button
                         onClick={() => handlePreviewPDF(student.id)}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200"
+                        style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.4)', color: '#c4b5fd' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.4)'; e.currentTarget.style.color = '#fff'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.2)'; e.currentTarget.style.color = '#c4b5fd'; }}
                       >
                         👁️ Preview PDF
                       </button>
                       <button
                         onClick={() => handleSendAlert(student.id, `${student.first_name} ${student.last_name}`)}
                         disabled={sending || !student.parent_email}
-                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm"
+                        className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 disabled:opacity-40"
+                        style={{ background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.4)', color: '#fdba74' }}
+                        onMouseEnter={e => { if (!sending && student.parent_email) { e.currentTarget.style.background = 'rgba(249,115,22,0.4)'; e.currentTarget.style.color = '#fff'; }}}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(249,115,22,0.2)'; e.currentTarget.style.color = '#fdba74'; }}
                       >
                         📧 Send Alert
                       </button>
@@ -458,182 +517,219 @@ const AttendanceAlertsTab = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <div className="text-3xl">📅</div>
-          <div className="flex-1">
-            <h3 className="text-lg font-bold text-gray-800 mb-1">
-              Attendance Threshold Alert System
-            </h3>
-            <p className="text-sm text-gray-600">
-              Set attendance threshold and send email alerts to parents of students below that threshold. 
-              Alerts include detailed attendance report in simple text/table format.
-            </p>
-          </div>
+      {/* Info Banner */}
+      <div className="flex items-center gap-4 p-4 rounded-2xl"
+        style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.25)' }}>
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+          style={{ background: 'rgba(234,179,8,0.15)' }}>📅</div>
+        <div>
+          <p className="font-semibold text-sm text-white">Attendance Threshold Alert System</p>
+          <p className="text-xs mt-0.5" style={{ color: 'rgba(165,180,252,0.6)' }}>
+            Set attendance threshold and send email alerts to parents of students below that threshold.
+            Alerts include detailed attendance report in simple text/table format.
+          </p>
         </div>
       </div>
 
-      {/* Threshold Settings */}
-      <div className="bg-white border rounded-lg p-6">
-        <h3 className="text-lg font-semibold mb-4">⚙️ Configure Threshold & Filters</h3>
-        <div className="grid grid-cols-4 gap-4">
+      {/* Threshold & Filters */}
+      <div className="p-4 rounded-2xl space-y-3"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.2)' }}>
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(165,180,252,0.6)' }}>Configure Threshold &amp; Filters</p>
+        <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Attendance Threshold (%)
-            </label>
+            <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(165,180,252,0.7)' }}>Threshold (%)</label>
             <input
-              type="number"
-              min="0"
-              max="100"
-              step="1"
+              type="number" min="0" max="100" step="1"
               value={threshold}
               onChange={(e) => setThreshold(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-32 px-4 py-2.5 rounded-xl text-sm outline-none transition-all duration-200"
+              style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: '#fff' }}
+              onFocus={e => e.target.style.borderColor = '#6366f1'}
+              onBlur={e => e.target.style.borderColor = 'rgba(99,102,241,0.3)'}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Grade (Optional)</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(165,180,252,0.7)' }}>Grade</label>
             <select
               value={selectedGrade}
               onChange={(e) => setSelectedGrade(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2.5 rounded-xl text-sm outline-none transition-all duration-200"
+              style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc' }}
             >
-              <option value="">All Grades</option>
-              {grades.map(g => (
-                <option key={g} value={g}>Grade {g}</option>
-              ))}
+              <option value="" style={{ background: '#1e1b4b' }}>All Grades</option>
+              {grades.map(g => <option key={g} value={g} style={{ background: '#1e1b4b' }}>Grade {g}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Section (Optional)</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(165,180,252,0.7)' }}>Section</label>
             <select
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2.5 rounded-xl text-sm outline-none transition-all duration-200"
+              style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc' }}
             >
-              <option value="">All Sections</option>
-              {sections.map(s => (
-                <option key={s} value={s}>Section {s}</option>
-              ))}
+              <option value="" style={{ background: '#1e1b4b' }}>All Sections</option>
+              {sections.map(s => <option key={s} value={s} style={{ background: '#1e1b4b' }}>Section {s}</option>)}
             </select>
           </div>
-          <div className="flex items-end">
-            <button
-              onClick={checkThreshold}
-              disabled={loading}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {loading ? 'Checking...' : '🔍 Check Threshold'}
-            </button>
-          </div>
+          <button
+            onClick={checkThreshold}
+            disabled={loading}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 disabled:opacity-50"
+            style={{ background: loading ? 'rgba(99,102,241,0.4)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+          >
+            {loading
+              ? <span className="flex items-center gap-2"><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Checking...</span>
+              : '🔍 Check Threshold'
+            }
+          </button>
         </div>
       </div>
 
       {/* Results */}
       {students.length > 0 && (
         <>
-          {/* Statistics */}
-          <div className="grid grid-cols-4 gap-4">
-            <div className="bg-white border rounded-lg p-4">
-              <p className="text-sm text-gray-500">Students Below Threshold</p>
-              <p className="text-3xl font-bold text-gray-800">{students.length}</p>
-            </div>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-gray-600">Below 60%</p>
-              <p className="text-3xl font-bold text-red-700">
-                {students.filter(s => s.attendance_rate < 60).length}
-              </p>
-            </div>
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <p className="text-sm text-gray-600">60% - 75%</p>
-              <p className="text-3xl font-bold text-orange-700">
-                {students.filter(s => s.attendance_rate >= 60 && s.attendance_rate < 75).length}
-              </p>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-gray-600">Selected</p>
-              <p className="text-3xl font-bold text-blue-700">{selectedStudents.length}</p>
-            </div>
+          {/* Stat Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: 'Below Threshold', value: students.length,                                                                          icon: '📉', bg: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(99,102,241,0.1))',  border: 'rgba(99,102,241,0.4)'  },
+              { label: 'Below 60%',       value: students.filter(s => s.attendance_rate < 60).length,                                      icon: '🔴', bg: 'linear-gradient(135deg, rgba(239,68,68,0.3), rgba(239,68,68,0.1))',    border: 'rgba(239,68,68,0.4)'   },
+              { label: '60% – 75%',       value: students.filter(s => s.attendance_rate >= 60 && s.attendance_rate < 75).length,           icon: '🟠', bg: 'linear-gradient(135deg, rgba(249,115,22,0.3), rgba(249,115,22,0.1))',  border: 'rgba(249,115,22,0.4)'  },
+              { label: 'Selected',        value: selectedStudents.length,                                                                   icon: '✅', bg: 'linear-gradient(135deg, rgba(34,197,94,0.3), rgba(34,197,94,0.1))',    border: 'rgba(34,197,94,0.4)'   },
+            ].map(card => (
+              <div key={card.label} className="rounded-2xl p-5 flex items-center gap-4 transition-all duration-200 hover:-translate-y-1"
+                style={{ background: card.bg, border: `1px solid ${card.border}` }}>
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                  style={{ background: 'rgba(0,0,0,0.2)' }}>{card.icon}</div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.6)' }}>{card.label}</p>
+                  <p className="text-3xl font-bold text-white mt-0.5">{card.value}</p>
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* Bulk Actions */}
-          <div className="bg-gray-50 border rounded-lg p-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedStudents.length === students.length}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Select All</span>
-                </label>
-                <span className="text-sm text-gray-600">
-                  {selectedStudents.length} of {students.length} selected
-                </span>
-              </div>
-              <button
-                onClick={handleSendBulk}
-                disabled={sending || students.length === 0}
-                className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
-              >
-                {sending ? 'Sending...' : `📧 Send Alerts to ${selectedStudents.length > 0 ? selectedStudents.length : students.length} Students`}
-              </button>
-            </div>
+          {/* Bulk Actions Bar */}
+          <div className="flex justify-between items-center p-3 rounded-2xl"
+            style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedStudents.length === students.length && students.length > 0}
+                onChange={toggleSelectAll}
+                className="w-4 h-4 accent-indigo-500"
+              />
+              <span className="text-sm font-medium" style={{ color: '#a5b4fc' }}>Select All</span>
+              <span className="text-xs px-2 py-0.5 rounded-lg"
+                style={{ background: 'rgba(99,102,241,0.15)', color: 'rgba(165,180,252,0.7)' }}>
+                {selectedStudents.length} of {students.length}
+              </span>
+            </label>
+            <button
+              onClick={handleSendBulk}
+              disabled={sending || students.length === 0}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-40"
+              style={{ background: selectedStudents.length === 0 ? 'rgba(234,179,8,0.1)' : 'linear-gradient(135deg, rgba(234,179,8,0.6), rgba(249,115,22,0.5))', border: '1px solid rgba(234,179,8,0.4)', color: selectedStudents.length === 0 ? '#fde047' : '#fff' }}
+              onMouseEnter={e => { if (students.length > 0) e.currentTarget.style.opacity = '0.85'; }}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            >
+              {sending
+                ? <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Sending...</>
+                : `📧 Send Alerts to ${selectedStudents.length > 0 ? selectedStudents.length : students.length} Students`
+              }
+            </button>
           </div>
 
           {/* Student List */}
-          <div>
-            <h3 className="text-xl font-semibold mb-4">Students Below {threshold}% Attendance</h3>
-            <div className="space-y-3">
-              {students.map((student) => (
-                <div key={student.id} className="border rounded-lg p-4 hover:shadow-md transition">
-                  <div className="flex items-start gap-4">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 mb-1">
+              <h3 className="text-base font-bold text-white">Students Below {threshold}% Attendance</h3>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-xl"
+                style={{ background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.3)', color: '#fde047' }}>
+                {students.length} student{students.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            {students.map((student) => {
+              const rate = student.attendance_rate;
+              const rateStyle = rate < 60
+                ? { bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.4)',  color: '#fca5a5' }
+                : rate < 75
+                ? { bg: 'rgba(249,115,22,0.15)', border: 'rgba(249,115,22,0.4)', color: '#fdba74' }
+                : { bg: 'rgba(34,197,94,0.15)',  border: 'rgba(34,197,94,0.4)',  color: '#86efac' };
+              return (
+                <div key={student.id}
+                  className="p-4 rounded-2xl transition-all duration-200"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(99,102,241,0.15)' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(99,102,241,0.15)'}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Checkbox */}
                     <input
                       type="checkbox"
                       checked={selectedStudents.includes(student.id)}
                       onChange={() => toggleStudentSelection(student.id)}
-                      className="mt-1 w-4 h-4"
+                      className="mt-1 w-4 h-4 accent-indigo-500 flex-shrink-0 cursor-pointer"
                     />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h4 className="text-lg font-semibold text-gray-800">{student.name}</h4>
-                        <span className={`text-2xl font-bold ${getAttendanceColor(student.attendance_rate)}`}>
-                          {student.attendance_rate}%
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                      {student.name?.split(' ')[0]?.[0]}{student.name?.split(' ')[1]?.[0]}
+                    </div>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="text-sm font-bold text-white">{student.name}</span>
+                        <span className="text-xs font-mono px-2 py-0.5 rounded-lg"
+                          style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
+                          {student.student_id}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold"
+                          style={{ background: rateStyle.bg, border: `1px solid ${rateStyle.border}`, color: rateStyle.color }}>
+                          {rate}%
                         </span>
                       </div>
-                      <div className="grid grid-cols-3 gap-x-6 gap-y-1 text-sm text-gray-600">
-                        <p><span className="font-medium">Grade:</span> {student.grade} - Section {student.section}</p>
-                        <p><span className="font-medium">Student ID:</span> {student.student_id}</p>
-                        <p><span className="font-medium">Parent:</span> {student.parent_name || 'N/A'}</p>
-                        <p><span className="font-medium">Total Days:</span> {student.total_days}</p>
-                        <p><span className="font-medium">Present:</span> {student.present_days}</p>
-                        <p><span className="font-medium">Absent:</span> {student.absent_days}</p>
-                        <p className="col-span-3"><span className="font-medium">Email:</span> {student.parent_email || 'N/A'}</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1">
+                        {[
+                          { label: 'Grade',       value: `${student.grade} — Section ${student.section}` },
+                          { label: 'Parent',      value: student.parent_name || 'N/A' },
+                          { label: 'Email',       value: student.parent_email || 'N/A' },
+                          { label: 'Total Days',  value: student.total_days },
+                          { label: 'Present',     value: student.present_days },
+                          { label: 'Absent',      value: student.absent_days },
+                        ].map(f => (
+                          <p key={f.label} className="text-xs">
+                            <span style={{ color: 'rgba(165,180,252,0.5)' }}>{f.label}: </span>
+                            <span style={{ color: 'rgba(165,180,252,0.85)' }}>{f.value}</span>
+                          </p>
+                        ))}
                       </div>
                     </div>
+                    {/* Send Button */}
                     <button
                       onClick={() => handleSendSingle(student)}
                       disabled={sending || !student.parent_email}
-                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm"
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200 disabled:opacity-40 flex-shrink-0"
+                      style={{ background: 'rgba(234,179,8,0.2)', border: '1px solid rgba(234,179,8,0.4)', color: '#fde047' }}
+                      onMouseEnter={e => { if (!sending && student.parent_email) { e.currentTarget.style.background = 'rgba(234,179,8,0.4)'; e.currentTarget.style.color = '#fff'; }}}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(234,179,8,0.2)'; e.currentTarget.style.color = '#fde047'; }}
                     >
                       📧 Send Alert
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </>
       )}
 
       {!loading && students.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          <div className="text-6xl mb-4">✅</div>
-          <p className="text-lg font-medium">No students below {threshold}% attendance threshold</p>
-          <p className="text-sm mt-2">All students are meeting the attendance requirements!</p>
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
+            style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)' }}>✅</div>
+          <p className="text-sm font-semibold" style={{ color: '#86efac' }}>All students meeting attendance requirements</p>
+          <p className="text-xs" style={{ color: 'rgba(165,180,252,0.45)' }}>No students found below {threshold}% threshold</p>
         </div>
       )}
     </div>
