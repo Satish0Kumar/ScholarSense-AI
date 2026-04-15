@@ -15,7 +15,7 @@ const Header = () => {
       style={{ background: 'rgba(15,12,41,0.85)', borderBottom: '1px solid rgba(99,102,241,0.2)', backdropFilter: 'blur(20px)' }}>
 
       <div>
-        <p className="text-white text-sm font-semibold">{greeting}, {user?.name?.split(' ')[0] || 'User'} 👋</p>
+        <p className="text-white text-sm font-semibold">{greeting}, {user?.full_name?.split(' ')[0] || user?.username || 'User'} 👋</p>
         <p className="text-xs" style={{ color: 'rgba(165,180,252,0.6)' }}>
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
@@ -31,7 +31,7 @@ const Header = () => {
         {/* avatar */}
         <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
           style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-          {user?.name?.[0]?.toUpperCase() || 'U'}
+          {user?.full_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || 'U'}
         </div>
 
         {/* logout */}
