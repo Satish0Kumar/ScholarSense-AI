@@ -5,36 +5,47 @@ ScholarSense - AI-Powered Academic Intelligence System
 import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.pool import NullPool
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-# Database Configuration
-DATABASE_CONFIG = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'port': os.getenv('DB_PORT', '5432'),
-    'database': os.getenv('DB_NAME', 'scholarsense'),
-    'user': os.getenv('DB_USER', 'scholar_admin'),
-    'password': os.getenv('DB_PASSWORD', 'Scholar@2026')
-}
-
 # Import urllib for URL encoding
 from urllib.parse import quote_plus
 
-# Create Database URL with encoded password
-DATABASE_URL = (
-    f"postgresql://{DATABASE_CONFIG['user']}:{quote_plus(DATABASE_CONFIG['password'])}"
-    f"@{DATABASE_CONFIG['host']}:{DATABASE_CONFIG['port']}/{DATABASE_CONFIG['database']}"
-)
+# Check if DATABASE_URL is provided directly (for Render/Heroku)
+DATABASE_URL = os.getenv('DATABASE_URL')
 
-# Create SQLAlchemy Engine
+if not DATABASE_URL:
+    # Fallback: build from individual environment variables
+    DATABASE_CONFIG = {
+        'host': os.getenv('DB_HOST', 'localhost'),
+        'port': os.getenv('DB_PORT', '5432'),
+        'database': os.getenv('DB_NAME', 'scholarsense'),
+        'user': os.getenv('DB_USER', 'scholar_admin'),
+        'password': os.getenv('DB_PASSWORD', 'Scholar@2026')
+    }
+    
+    # Create Database URL with encoded password
+    DATABASE_URL = (
+        f"postgresql://{DATABASE_CONFIG['user']}:{quote_plus(DATABASE_CONFIG['password'])}"
+        f"@{DATABASE_CONFIG['host']}:{DATABASE_CONFIG['port']}/{DATABASE_CONFIG['database']}"
+    )
+else:
+    # Parse DATABASE_URL for display purposes
+    DATABASE_CONFIG = {
+        'host': 'from DATABASE_URL',
+        'port': 'from DATABASE_URL',
+        'database': 'from DATABASE_URL',
+        'user': 'from DATABASE_URL',
+        'password': '***'
+    }
+
+# Create SQLAlchemy Engine with NullPool for serverless environments
 engine = create_engine(
     DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=10,
-    max_overflow=20,
+    poolclass=NullPool,  # No persistent connections (better for serverless)
     pool_pre_ping=True,  # Verify connections before using
     echo=False  # Set to True for SQL debugging
 )
