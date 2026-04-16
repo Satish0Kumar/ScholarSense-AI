@@ -47,7 +47,11 @@ engine = create_engine(
     DATABASE_URL,
     poolclass=NullPool,  # No persistent connections (better for serverless)
     pool_pre_ping=True,  # Verify connections before using
-    echo=False  # Set to True for SQL debugging
+    echo=False,  # Set to True for SQL debugging
+    connect_args={
+        'client_encoding': 'utf8',
+        'connect_timeout': 10,
+    }
 )
 
 # Create Session Factory
