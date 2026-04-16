@@ -45,13 +45,9 @@ else:
 # Create SQLAlchemy Engine with NullPool for serverless environments
 engine = create_engine(
     DATABASE_URL,
-    poolclass=NullPool,  # No persistent connections (better for serverless)
-    pool_pre_ping=True,  # Verify connections before using
-    echo=False,  # Set to True for SQL debugging
-    connect_args={
-        'client_encoding': 'utf8',
-        'connect_timeout': 10,
-    }
+    poolclass=NullPool,
+    pool_pre_ping=True,
+    echo=False
 )
 
 # Create Session Factory
