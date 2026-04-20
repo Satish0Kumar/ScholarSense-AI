@@ -54,14 +54,14 @@ def create_academic_record():
         print(f"✅ Academic record created: Student {result['student_id']} - {result['semester']}")
 
         # Auto-trigger parent notification
-        try:
-            notif_results = NotificationService.check_and_notify_academic(
-                student_id        = result['student_id'],
-                academic_record_id = result.get('id')
-            )
-            print(f"📨 Notification check: {notif_results}")
-        except Exception as notif_err:
-            print(f"⚠️ Notification error (non-critical): {notif_err}")
+        # try:
+        #     notif_results = NotificationService.check_and_notify_academic(
+        #         student_id        = result['student_id'],
+        #         academic_record_id = result.get('id')
+        #     )
+        #     print(f"📨 Notification check: {notif_results}")
+        # except Exception as notif_err:
+        #     print(f"⚠️ Notification error (non-critical): {notif_err}")
 
         return jsonify(result), 201
     except Exception as e:

@@ -235,11 +235,11 @@ class PredictionService:
                 
                 # GPA factor (most important)
                 gpa = features.get('current_gpa', 0)
-                if gpa < 40:
+                if gpa < 4.0:
                     risk_level = 3  # Critical
-                elif gpa < 50:
+                elif gpa < 5.0:
                     risk_level = 2  # High
-                elif gpa < 65:
+                elif gpa < 6.5:
                     risk_level = 1  # Medium
                 
                 # Grade trend factor (declining trend increases risk)

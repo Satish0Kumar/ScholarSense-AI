@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
+import toast from 'react-hot-toast';
 
 /* ─────────────────────────────────────────
    Shared design tokens  (dark-glass theme)
@@ -186,11 +187,11 @@ const AttendanceTab = () => {
           status: (attendance[s.id] || 'Present').toLowerCase()
         }))
       });
-      alert('Attendance saved successfully!');
+      toast.success('Attendance saved successfully!');
       setIsPosted(true); setIsEditing(false);
       fetchDailyAttendance();
     } catch (err) {
-      alert('Failed to save: ' + (err.response?.data?.error || err.message));
+      toast.error('Failed to save: ' + (err.response?.data?.error || err.message));
     } finally { setSaving(false); }
   };
 
@@ -387,7 +388,7 @@ const MarksTab = () => {
       const m = marks[s.id];
       return !m?.math || !m?.science || !m?.english || !m?.social || !m?.language;
     });
-    if (empty.length > 0) { alert(`Fill all scores for: ${empty.map(s => `${s.first_name} ${s.last_name}`).join(', ')}`); return; }
+    if (empty.length > 0) { toast.error(`Fill all scores for: ${empty.map(s => `${s.first_name} ${s.last_name}`).join(', ')}`); return; }
     setSaving(true);
     try {
       await Promise.all(students.map(s => {
@@ -399,11 +400,11 @@ const MarksTab = () => {
           language_score: parseFloat(m.language)
         });
       }));
-      alert('Marks saved successfully!');
+      toast.success('Marks saved successfully!');
       setIsPosted(true); setIsEditing(false);
       fetchStudentsAndMarks();
     } catch (err) {
-      alert('Failed: ' + (err.response?.data?.message || err.response?.data?.error || err.message));
+      toast.error('Failed: ' + (err.response?.data?.message || err.response?.data?.error || err.message));
     } finally { setSaving(false); }
   };
 
@@ -568,15 +569,15 @@ const BehaviourTab = () => {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (!formData.student_id) { alert('Please select a student'); return; }
+    if (!formData.student_id) { toast.error('Please select a student'); return; }
     try {
       await api.post('/incidents/log', formData);
-      alert('Incident logged successfully!');
+      toast.success('Incident logged successfully!');
       setShowForm(false);
       setFormData({ student_id:'', incident_date: new Date().toISOString().split('T')[0], incident_type:'Disruption', severity:'Minor', description:'', location:'', action_taken:'' });
       fetchIncidents();
     } catch (err) {
-      alert('Failed: ' + (err.response?.data?.error || err.message));
+      toast.error('Failed: ' + (err.response?.data?.error || err.message));
     }
   };
 

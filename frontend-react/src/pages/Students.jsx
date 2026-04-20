@@ -6,6 +6,7 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import AddStudentForm from '../components/AddStudentForm';
+import toast from 'react-hot-toast';
 
 const glass = {
   background: 'rgba(255,255,255,0.04)',
@@ -69,8 +70,9 @@ const Students = () => {
       setShowDeleteModal(false);
       setSelectedStudent(null);
       setActiveTab('list');
+      toast.success('Student deleted successfully!');
     } catch {
-      alert('Failed to delete student');
+      toast.error('Failed to delete student');
     }
   };
 

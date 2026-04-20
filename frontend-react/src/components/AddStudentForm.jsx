@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import api from '../utils/api';
+import toast from 'react-hot-toast';
 
 const inputStyle = {
   background: 'rgba(99,102,241,0.08)',
@@ -91,6 +92,7 @@ const AddStudentForm = ({ onClose, onSuccess }) => {
         english_score: parseFloat(formData.english_score), social_score: parseFloat(formData.social_score),
         language_score: parseFloat(formData.language_score),
       });
+      toast.success('Student created successfully!');
       onSuccess(); onClose();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create student');

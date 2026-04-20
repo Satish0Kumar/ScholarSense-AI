@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
+import toast from 'react-hot-toast';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -39,10 +40,10 @@ const UserManagement = () => {
           role: formData.role,
           is_active: formData.is_active
         });
-        alert('User updated successfully!');
+        toast.success('User updated successfully!');
       } else {
         await api.post('/users/create', formData);
-        alert('User created successfully!');
+        toast.success('User created successfully!');
       }
       setShowForm(false);
       setEditingUser(null);
@@ -55,7 +56,7 @@ const UserManagement = () => {
       });
       fetchUsers();
     } catch (error) {
-      alert('Operation failed: ' + (error.response?.data?.error || error.message));
+      toast.error('Operation failed: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -78,19 +79,20 @@ const UserManagement = () => {
     }
     try {
       await api.delete(`/users/${userId}`);
-      alert('User deleted successfully!');
+      toast.success('User deleted successfully!');
       fetchUsers();
     } catch (error) {
-      alert('Delete failed: ' + (error.response?.data?.error || error.message));
+      toast.error('Delete failed: ' + (error.response?.data?.error || error.message));
     }
   };
 
   const handleToggleStatus = async (userId, currentStatus) => {
     try {
       await api.put(`/users/${userId}`, { is_active: !currentStatus });
+      toast.success('User status updated successfully!');
       fetchUsers();
     } catch (error) {
-      alert('Status update failed: ' + (error.response?.data?.error || error.message));
+      toast.error('Status update failed: ' + (error.response?.data?.error || error.message));
     }
   };
 

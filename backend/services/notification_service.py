@@ -33,7 +33,7 @@ from backend.services.email_service import EmailService
 from sqlalchemy import func
 
 # ── Thresholds ─────────────────────────────────────────────────────────────────
-GPA_THRESHOLD         = 50.0    # Below this → low_gpa alert
+GPA_THRESHOLD         = 5.0    # Below this → low_gpa alert
 ATTENDANCE_THRESHOLD  = 75.0    # Below this → low_attendance alert
 FAILED_SUBJ_THRESHOLD = 2       # >= this    → failed_subjects alert
 HIGH_RISK_LEVELS      = ['High', 'Critical']
@@ -237,15 +237,15 @@ class NotificationService:
                 ):
                     reason = (
                         f"{student_name}'s current GPA has dropped to "
-                        f"{academic.current_gpa:.1f}% which is below the "
-                        f"required threshold of {GPA_THRESHOLD}%."
+                        f"{academic.current_gpa:.1f} which is below the "
+                        f"required threshold of {GPA_THRESHOLD}."
                     )
                     details = {
-                        'Current GPA'  : f"{academic.current_gpa:.1f}%",
-                        'Previous GPA' : f"{academic.previous_gpa:.1f}%",
+                        'Current GPA'  : f"{academic.current_gpa:.1f}",
+                        'Previous GPA' : f"{academic.previous_gpa:.1f}",
                         'Grade Trend'  : (
                             f"{'📈' if academic.grade_trend >= 0 else '📉'} "
-                            f"{academic.grade_trend:+.1f}%"
+                            f"{academic.grade_trend:+.1f}"
                         ),
                         'Math Score'   : f"{academic.math_score:.1f}%",
                         'Science Score': f"{academic.science_score:.1f}%",
@@ -288,7 +288,7 @@ class NotificationService:
                     details = {
                         'Failed Subjects' : ', '.join(failed_list) or f"{failed} subjects",
                         'Total Subjects'  : str(academic.total_subjects or 5),
-                        'Current GPA'     : f"{academic.current_gpa:.1f}%",
+                        'Current GPA'     : f"{academic.current_gpa:.1f}",
                         'Submission Rate' : f"{academic.assignment_submission_rate:.1f}%",
                     }
                     notif = NotificationService._create_notification_record(
