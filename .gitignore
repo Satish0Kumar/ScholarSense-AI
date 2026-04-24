@@ -14,6 +14,11 @@ __pycache__/
 *.pkl
 *.log
 
+# ── Local SQL dumps (never commit) ─────────────────
+*.sql
+!backend/database/schema.sql
+!backend/database/communications_migration.sql
+
 # ── OS files ───────────────────────────────────────
 .DS_Store
 Thumbs.db
