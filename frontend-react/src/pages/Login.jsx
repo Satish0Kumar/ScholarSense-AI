@@ -102,12 +102,6 @@ const Login = () => {
     setError('');
   };
 
-  /* ── quick-fill demo credentials ── */
-  const fillDemo = (role) => {
-    if (role === 'admin') { setEmail('admin@scholarsense.com'); setPassword('admin123'); }
-    else { setEmail('teacher@scholarsense.com'); setPassword('teacher123'); }
-  };
-
   /* ── orb config ── */
   const orbs = [
     { width: 320, height: 320, background: '#6366f1', top: '-80px', left: '-80px' },
@@ -241,22 +235,6 @@ const Login = () => {
                   ) : 'Sign In →'}
                 </button>
               </form>
-
-              {/* demo accounts */}
-              <div className="mt-7 pt-6" style={{ borderTop: '1px solid rgba(99,102,241,0.2)' }}>
-                <p className="text-xs text-indigo-400 text-center mb-3 uppercase tracking-wider">Quick Demo Access</p>
-                <div className="flex gap-3">
-                  {[{ role: 'admin', label: '🛡️ Admin' }, { role: 'teacher', label: '👩🏫 Teacher' }].map(d => (
-                    <button key={d.role} onClick={() => fillDemo(d.role)}
-                      className="flex-1 py-2 rounded-lg text-xs font-medium text-indigo-300 hover:text-white transition-all duration-200"
-                      style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}
-                      onMouseEnter={e => e.target.style.background = 'rgba(99,102,241,0.25)'}
-                      onMouseLeave={e => e.target.style.background = 'rgba(99,102,241,0.1)'}>
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
           ) : (
